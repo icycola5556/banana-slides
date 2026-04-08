@@ -96,13 +96,48 @@ import {
   renderVaultCompareLayoutHTML,
   renderVaultDebriefLayoutHTML,
 } from './vault';
-import { normalizeLayoutId } from './aliases';
+import { normalizeLayoutId, resolveThemeLayout } from './aliases';
 import { getLayoutDisplayName } from './names';
+
+const injectThemeBackgroundIntoHtml = (
+  html: string,
+  layoutId: LayoutId,
+  model: Record<string, unknown>
+): string => {
+  const backgroundImage = typeof model?.background_image === 'string'
+    ? model.background_image.trim()
+    : '';
+
+  if (!backgroundImage || (!layoutId.startsWith('blueprint_') && !layoutId.startsWith('vault_'))) {
+    return html;
+  }
+
+  const overlay = layoutId.startsWith('vault_')
+    ? 'linear-gradient(rgba(0, 5, 15, 0.78), rgba(0, 5, 15, 0.78)), '
+    : 'linear-gradient(rgba(4, 7, 13, 0.72), rgba(4, 7, 13, 0.72)), ';
+  const backgroundStyle = `background-image:${overlay}url(${backgroundImage});background-size:cover;background-position:center;background-repeat:no-repeat;`;
+
+  if (/^<([a-z]+)\s+style="[^"]*url\(/i.test(html)) {
+    return html;
+  }
+
+  if (/^<([a-z]+)\s+style="/i.test(html)) {
+    return html.replace(
+      /^<([a-z]+)\s+style="([^"]*)"/i,
+      `<$1 style="$2;${backgroundStyle}"`
+    );
+  }
+
+  return html.replace(
+    /^<([a-z]+)([^>]*)>/i,
+    `<$1$2 style="${backgroundStyle}">`
+  );
+};
 
 
 export function renderLayoutHTML(
   layoutId: LayoutId,
-  model: LayoutModel,
+  rawModel: LayoutModel,
   theme: ThemeConfig
 ): string {
   let normalizedId = normalizeLayoutId(layoutId);
@@ -157,9 +192,15 @@ export function renderLayoutHTML(
       normalizedId = vaultMap[normalizedId];
     }
   }
+  const resolved = resolveThemeLayout(layoutId, rawModel, theme);
+  normalizedId = resolved.layoutId;
+  const model = resolved.model;
   const enrichedModel = { ...model, layoutId };
+  let renderedHtml: string;
 
-  switch (normalizedId) {
+  try {
+    renderedHtml = (() => {
+      switch (normalizedId) {
     case 'cover':
       return renderCoverLayoutHTML(model as any, theme);
     case 'toc':
@@ -303,7 +344,7 @@ export function renderLayoutHTML(
     case 'blueprint_big_reveal':
       return renderBlueprintBigRevealLayoutHTML(model as any);
     case 'blueprint_closing':
-      return renderBlueprintClosingLayoutHTML(enrichedModel as any, theme);
+      return renderBlueprintClosingLayoutHTML(enrichedModel as any);
     
     // DATA VAULT
     case 'vault_cover':
@@ -336,5 +377,17 @@ export function renderLayoutHTML(
       return `<section style="width:1280px;height:720px;display:flex;align-items:center;justify-content:center;background:#f0f0f0;">
         <p style="color:#666;">未知布局类型：${getLayoutDisplayName(layoutId)}</p>
       </section>`;
+    }
+    })();
+  } catch (error) {
+    console.error('[renderLayoutHTML] Error rendering layout:', normalizedId, error);
+    renderedHtml = `<section style="width:1280px;height:720px;display:flex;align-items:center;justify-content:center;background:#fee;color:#c00;font-family:'PingFang SC','Microsoft YaHei',sans-serif;box-sizing:border-box;padding:40px;text-align:center;">
+      <div>
+        <div style="font-size:28px;font-weight:700;margin-bottom:12px;">布局导出失败</div>
+        <div style="font-size:16px;color:#444;">${getLayoutDisplayName(layoutId)} / ${normalizedId}</div>
+      </div>
+    </section>`;
   }
+
+  return injectThemeBackgroundIntoHtml(renderedHtml, normalizedId, model as Record<string, unknown>);
 }

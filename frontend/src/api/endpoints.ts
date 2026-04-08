@@ -916,6 +916,10 @@ export interface HtmlImageSlot {
     extra_requirements?: string;
     template_style?: string;
     visual_goal?: string;
+    annotation_targets?: Array<{
+      label?: string;
+      description?: string;
+    }>;
     industry?: string;
     audience?: string;
   };

@@ -36,12 +36,18 @@ import { useProjectStore } from '@/store/useProjectStore';
 import { useExportTasksStore, type ExportTaskType } from '@/store/useExportTasksStore';
 import { getImageUrl } from '@/api/client';
 import { getPageImageVersions, setCurrentImageVersion, updateProject, updatePage, uploadTemplate, exportPPTX as apiExportPPTX, exportPDF as apiExportPDF, exportEditablePPTX as apiExportEditablePPTX, generateHtmlImagesStreaming, generateLayoutPlan, generatePageImage, saveHtmlImage, type HtmlImageSlot, type HtmlImageSSEEvent } from '@/api/endpoints';
-import { fileToBase64 } from '@/experimental/html-renderer/utils/htmlExporter';
+import {
+  downloadHTML,
+  fileToBase64,
+  generateHTMLDocument,
+  inlinePagePayloadModels,
+} from '@/experimental/html-renderer/utils/htmlExporter';
 import type { Page, ImageVersion, DescriptionContent, ExportExtractorMethod, ExportInpaintMethod, LayoutId } from '@/types';
 import { normalizeErrorMessage } from '@/utils';
 import {
   collectHtmlImageSlotDescriptors,
   sanitizeHtmlModelImageSources,
+  sanitizeThemeImageSlotSources,
 } from '@/utils/htmlImageSlots';
 import { getScaleToFit, getWidthFitScale } from '@/utils/slideScale';
 // HTML渲染模式组件
@@ -49,13 +55,10 @@ import { SlideRenderer } from '@/experimental/html-renderer/components/SlideRend
 import { getThemeByScheme } from '@/experimental/html-renderer/themes';
 import type { PagePayload, ThemeConfig } from '@/experimental/html-renderer/types/schema';
 import {
-  generateHTMLDocument,
-  downloadHTML,
-} from '@/experimental/html-renderer/utils/htmlExporter';
-import {
   renderLayoutHTML,
   normalizeLayoutId,
   getLayoutDisplayName,
+  resolveThemeLayout,
 } from '@/experimental/html-renderer/layouts';
 
 const VARIANT_POOLS: Record<string, { id: string; label: string }[]> = {
@@ -70,6 +73,8 @@ const VARIANT_POOLS: Record<string, { id: string; label: string }[]> = {
   edu_logic_flow: [{ id: 'a', label: '逻辑流程' }, { id: 'b', label: '分支流程' }],
   edu_data_board: [{ id: 'a', label: '数据面板' }, { id: 'b', label: '数据卡片' }],
   edu_summary: [{ id: 'a', label: '总结回顾' }, { id: 'b', label: '关键收获' }],
+  // warm_edu 主题将 edu_summary 映射到 vocational_mission_complete，需要同步定义变体
+  vocational_mission_complete: [{ id: 'a', label: '总结回顾' }, { id: 'b', label: '关键收获' }],
 };
 
 export const SlidePreview: React.FC = () => {
@@ -142,6 +147,7 @@ export const SlidePreview: React.FC = () => {
   const [isVariantUpdating, setIsVariantUpdating] = useState(false);
   const isEditingTemplateStyle = useRef(false); // 跟踪用户是否正在编辑风格描述
   const lastProjectId = useRef<string | null>(null); // 跟踪上一次的项目ID
+  const pageVariantStateRef = useRef<Record<string, string>>({});
   const [isProjectSettingsOpen, setIsProjectSettingsOpen] = useState(false);
   // 素材生成模态开关（模块本身可复用，这里只是示例入口）
   const [isMaterialModalOpen, setIsMaterialModalOpen] = useState(false);
@@ -302,6 +308,25 @@ export const SlidePreview: React.FC = () => {
     return normalized;
   }, [inferTwoColumnPartType]);
 
+  const hasStructuredTwoColumnPart = useCallback((part: Record<string, unknown> | undefined): boolean => {
+    if (!part || typeof part !== 'object') {
+      return false;
+    }
+
+    return Object.entries(part).some(([key, value]) => {
+      if (key === 'type') {
+        return false;
+      }
+      if (Array.isArray(value)) {
+        return value.length > 0;
+      }
+      if (typeof value === 'string') {
+        return value.trim().length > 0;
+      }
+      return value != null;
+    });
+  }, []);
+
   const shouldUseOptionalImageSlot = useCallback((
     page: Page,
     normalizedModel?: Record<string, unknown>
@@ -309,13 +334,23 @@ export const SlidePreview: React.FC = () => {
     const outline = page?.outline_content
       ? ({ ...page.outline_content } as Record<string, unknown>)
       : undefined;
+    // 如果 outline 明确要求配图，启用图片插槽
     if (typeof outline?.has_image === 'boolean') {
       return outline.has_image;
     }
 
-    const modelCandidate = normalizedModel ?? (page?.html_model as unknown as Record<string, unknown> | undefined);
+    // 检查模型中是否有图片相关字段（包括空的占位符）
+    const rawModel = page?.html_model as unknown as Record<string, unknown> | undefined;
+    const modelCandidate = normalizedModel ?? rawModel;
     const image = modelCandidate?.image as unknown as Record<string, unknown> | undefined;
-    return !!(image && typeof image === 'object');
+
+    // 只要有 image 对象、image_src 或 image_alt 任一字段，就认为需要图片插槽
+    // 即使是空的占位符也应该被计入，因为可以通过批量生成填充
+    const hasImageObject = !!(image && typeof image === 'object');
+    const hasImageSrc = typeof modelCandidate?.image_src === 'string';
+    const hasImageAlt = typeof modelCandidate?.image_alt === 'string';
+
+    return hasImageObject || hasImageSrc || hasImageAlt;
   }, []);
 
   const resolveLayoutVariant = useCallback(
@@ -329,21 +364,89 @@ export const SlidePreview: React.FC = () => {
     [],
   );
 
+  const resolvePageVariant = useCallback(
+    (
+      pageId: string,
+      model: Record<string, unknown> | undefined,
+      fallback?: string,
+    ): string => {
+      const overriddenVariant = pageVariantStateRef.current[pageId];
+      if (overriddenVariant) {
+        return resolveLayoutVariant(
+          {
+            ...(model || {}),
+            variant: overriddenVariant,
+            layout_variant: overriddenVariant,
+          },
+          overriddenVariant,
+        );
+      }
+
+      return resolveLayoutVariant(model, fallback);
+    },
+    [resolveLayoutVariant],
+  );
+
+  useEffect(() => {
+    if (!currentProject?.pages) {
+      pageVariantStateRef.current = {};
+      return;
+    }
+
+    const nextVariantState: Record<string, string> = {};
+    currentProject.pages.forEach((page) => {
+      const pageId = page.id || page.page_id;
+      if (!pageId) return;
+
+      const model = page.html_model as Record<string, unknown> | undefined;
+      const outlineVariant = typeof page.outline_content?.layout_variant === 'string'
+        ? page.outline_content.layout_variant
+        : undefined;
+
+      nextVariantState[pageId] = resolveLayoutVariant(model, outlineVariant);
+    });
+
+    pageVariantStateRef.current = nextVariantState;
+  }, [currentProject?.id, currentProject?.pages, resolveLayoutVariant]);
+
   // 将上传的图片写回到模型对应的插槽路径
   const applyUploadedImagesToModel = useCallback((pageId: string, model: Record<string, unknown>) => {
     const slots = htmlPageImages[pageId];
     const updatedModel: Record<string, any> = { ...model };
+    const isIndexSegment = (segment: string) => /^\d+$/.test(segment);
     const setByPath = (path: string, value: string) => {
       const parts = path.split('.');
       let target: any = updatedModel;
+
       for (let i = 0; i < parts.length - 1; i += 1) {
         const key = parts[i];
+        const nextKey = parts[i + 1];
+
+        if (Array.isArray(target)) {
+          const index = Number(key);
+          if (!Number.isInteger(index)) {
+            return;
+          }
+          if (!target[index] || typeof target[index] !== 'object') {
+            target[index] = isIndexSegment(nextKey) ? [] : {};
+          }
+          target = target[index];
+          continue;
+        }
+
         if (!target[key] || typeof target[key] !== 'object') {
-          target[key] = {};
+          target[key] = isIndexSegment(nextKey) ? [] : {};
         }
         target = target[key];
       }
-      target[parts[parts.length - 1]] = value;
+
+      const lastKey = parts[parts.length - 1];
+      if (Array.isArray(target) && isIndexSegment(lastKey)) {
+        target[Number(lastKey)] = value;
+        return;
+      }
+
+      target[lastKey] = value;
     };
 
     if (slots) {
@@ -368,9 +471,7 @@ export const SlidePreview: React.FC = () => {
 
     // 如果有html_model，检查是否需要添加默认的image字段
     if (page.html_model && page.layout_id) {
-      console.log('[convertPageToPayload] Original layout_id:', page.layout_id);
       const layoutId = normalizeLayoutId(page.layout_id as LayoutId);
-      console.log('[convertPageToPayload] Normalized layout_id:', layoutId);
       let model = sanitizeHtmlModelImageSources(page.html_model) as unknown as Record<string, unknown>;
       const outlineContent = page.outline_content
         ? ({ ...page.outline_content } as Record<string, unknown>)
@@ -378,7 +479,7 @@ export const SlidePreview: React.FC = () => {
       const outlineVariant = typeof outlineContent?.layout_variant === 'string'
         ? outlineContent.layout_variant
         : undefined;
-      const variantId = resolveLayoutVariant(model, outlineVariant);
+      const variantId = resolvePageVariant(pageId, model, outlineVariant);
       model.variant = variantId;
       model.layout_variant = variantId;
 
@@ -396,6 +497,7 @@ export const SlidePreview: React.FC = () => {
       // 为支持图片的布局按需添加默认 image 字段（如果不存在）
       // 只有 outline 明确要求配图时才补占位，避免页面同质化为左文右图
       const layoutsWithOptionalImage = ['title_content', 'vocational_content', 'title_bullets', 'process_steps'];
+      const layoutsWithSharedVisualSlot = ['vocational_comparison'];
       if (layoutsWithOptionalImage.includes(layoutId) && outlineHasImage === true && !('image' in model)) {
         const defaultWidth = layoutId === 'process_steps' ? '80%' : '45%';
         // 添加默认的image字段，src为空字符串会显示占位符
@@ -414,6 +516,21 @@ export const SlidePreview: React.FC = () => {
           delete model.image;
         }
       }
+      if (layoutsWithSharedVisualSlot.includes(layoutId) && outlineHasImage === true && !('image' in model)) {
+        model.image = {
+          src: '',
+          alt: page.outline_content?.title || '配图',
+          position: 'right',
+          width: '40%',
+        };
+      }
+      if (layoutsWithSharedVisualSlot.includes(layoutId) && outlineHasImage === false && 'image' in model) {
+        const imageField = model.image as unknown as Record<string, unknown> | undefined;
+        const imageSrc = typeof imageField?.src === 'string' ? imageField.src.trim() : '';
+        if (!imageSrc) {
+          delete model.image;
+        }
+      }
 
       // image_full 布局必须有 image_src
       if (layoutId === 'image_full' && !('image_src' in model)) {
@@ -425,12 +542,20 @@ export const SlidePreview: React.FC = () => {
       if (layoutId === 'two_column' || layoutId === 'vocational_comparison') {
         const left = model.left as unknown as Record<string, unknown> | undefined;
         const right = model.right as unknown as Record<string, unknown> | undefined;
-        model.left = normalizeTwoColumnPart(left);
-        model.right = normalizeTwoColumnPart(right);
+        if (hasStructuredTwoColumnPart(left)) {
+          model.left = normalizeTwoColumnPart(left);
+        } else {
+          delete model.left;
+        }
+        if (hasStructuredTwoColumnPart(right)) {
+          model.right = normalizeTwoColumnPart(right);
+        } else {
+          delete model.right;
+        }
       }
 
       // 应用上传的图片到模型
-      model = applyUploadedImagesToModel(pageId, model);
+      model = sanitizeThemeImageSlotSources(applyUploadedImagesToModel(pageId, model), htmlTheme) as Record<string, unknown>;
 
       return {
         page_id: pageId,
@@ -570,12 +695,15 @@ export const SlidePreview: React.FC = () => {
     const outlineVariant = typeof outlineRecord.layout_variant === 'string'
       ? outlineRecord.layout_variant
       : undefined;
-    const variantId = resolveLayoutVariant(model, outlineVariant);
+    const variantId = resolvePageVariant(pageId, model, outlineVariant);
     model.variant = variantId;
     model.layout_variant = variantId;
 
     // 应用上传的图片到模型
-      model = applyUploadedImagesToModel(pageId, sanitizeHtmlModelImageSources(model));
+    model = sanitizeThemeImageSlotSources(
+      applyUploadedImagesToModel(pageId, sanitizeHtmlModelImageSources(model)),
+      htmlTheme,
+    ) as Record<string, unknown>;
 
     return {
       page_id: pageId,
@@ -583,7 +711,7 @@ export const SlidePreview: React.FC = () => {
       layout_id: layoutId,
       model: model as unknown as PagePayload['model'],
     };
-  }, [applyUploadedImagesToModel, normalizeTwoColumnPart, resolveLayoutVariant, sectionNumberMap]);
+  }, [applyUploadedImagesToModel, hasStructuredTwoColumnPart, htmlTheme, normalizeTwoColumnPart, resolvePageVariant, sectionNumberMap]);
 
   // 根据页面与布局生成 HTML 模式图片插槽
   const buildHtmlImageSlots = useCallback((pages: Page[], onlyIndex?: number): HtmlImageSlot[] => {
@@ -674,6 +802,22 @@ export const SlidePreview: React.FC = () => {
       return uniq.filter((x) => x.length > 1);
     };
 
+    const collectAnnotationTargets = (
+      model: Record<string, any>
+    ): Array<{ label: string; description: string }> => {
+      if (!Array.isArray(model?.annotations)) {
+        return [];
+      }
+
+      return model.annotations
+        .slice(0, 4)
+        .map((annotation: any) => ({
+          label: cleanText(annotation?.label),
+          description: cleanText(annotation?.description),
+        }))
+        .filter((annotation) => annotation.label || annotation.description);
+    };
+
     const getLayoutIntent = (layoutId: LayoutId, slotPath: string): string => {
       if (layoutId === 'edu_cover') {
         return '生成"封面主视觉图"，高端质感，适用于PPT封面右侧展示区域，主题鲜明、构图饱满。';
@@ -688,7 +832,7 @@ export const SlidePreview: React.FC = () => {
         return '生成“案例/讲解配图”，用于支撑职业情境说明，突出具体对象、操作场景或案例证据。';
       }
       if (layoutId === 'detail_zoom') {
-        return '生成“细节放大主体图”，主体应便于叠加标注点，局部结构清楚，可支撑步骤拆解或局部讲解。';
+        return '生成“细节放大主体图”，展示清晰的物理/机械/产品细节，局部结构清楚，便于后续在PPT上叠加文字标注点。图片本身不得包含任何文字、标签、标注或测量刻度。';
       }
       if (layoutId === 'portfolio') {
         return '生成“案例展示卡片图”，每张图都要对应一个独立案例场景，主体明确，便于网格化陈列。';
@@ -709,9 +853,9 @@ export const SlidePreview: React.FC = () => {
         return '生成“整页核心场景图”，突出主题对象与关键情境。';
       }
       if (layoutId === 'cover' || slotPath === 'hero_image' || slotPath === 'background_image') {
-        return '生成“封面辅助图”，强化主题识别，主体靠边，中心留白给标题，禁止文字/数字/Logo/水印。';
+        return '生成“封面辅助图”，强化主题识别，主体靠边，中心留白给标题，严禁出现任何文字、数字、Logo、水印、标签、标注。';
       }
-      return '生成“概念解释图”，用于辅助理解，不是背景纹理图。';
+      return '生成“概念解释图”，用于辅助理解，不是背景纹理图，严禁出现任何文字、标签、标注、测量刻度。';
     };
 
     const inferSlotRole = (slotPath: string): 'main' | 'left' | 'right' | 'background' => {
@@ -724,11 +868,24 @@ export const SlidePreview: React.FC = () => {
     const getPrompt = (
       layoutId: LayoutId,
       slotPath: string,
-      facts: string[]
+      facts: string[],
+      annotationTargets: Array<{ label: string; description: string }>
     ): string => {
       const topicLine = facts.length > 0
         ? `页面主题与信息：${facts.slice(0, 6).join('；')}`
         : '页面主题与信息：专业知识讲解场景';
+
+      const annotationLine = annotationTargets.length > 0
+        ? `标注目标：${annotationTargets
+          .map((annotation) => [annotation.label, annotation.description].filter(Boolean).join('：'))
+          .join('；')}`
+        : '';
+
+      const factBlob = facts.join(' ');
+      const isMechanicalHydraulicTopic = /液压|空蚀|气穴|汽蚀|泵|阀|活塞|流道|叶轮|金属|蒸汽压|疲劳|剥落|元件|机械|工程|hydraulic|cavitation|pitting|pump|valve|piston/i.test(factBlob);
+      const industrialMismatchGuard = isMechanicalHydraulicTopic
+        ? '行业边界：这是一页工业/液压/机械机理图，不允许出现人体、医疗设备、超声探头、手术场景、生物组织、医学影像屏幕。'
+        : '';
 
       if (layoutId === 'edu_cover' || layoutId === 'cover' || slotPath === 'hero_image' || slotPath === 'background_image') {
         return [
@@ -739,13 +896,41 @@ export const SlidePreview: React.FC = () => {
         ].join(' ');
       }
 
+      if (layoutId === 'detail_zoom') {
+        return [
+          '任务：为PPT生成工程机理细节标注主图，图像必须直接服务当前页的标注讲解。',
+          topicLine,
+          annotationLine,
+          industrialMismatchGuard,
+          '核心要求：每个标注目标都必须在图像中有清晰、可辨识、彼此不同的物理区域或结构，不能只是泛化的工业库存照片。',
+          '如果页面涉及液压、机械、工程机理，优先生成剖面、透明示意、部件特写或教学化机构示意，要能直接看出力的传递、面积差异、行程变化等关键关系。',
+          '构图要求：主体尽量充满主图区，避免大面积空白、无关白墙、无关背景。图片本身不加文字标注，标号和说明由PPT后叠加。',
+          '严禁：图片中出现任何文字、数字、字母、Logo、水印、标签、标注、测量刻度、指示箭头带文字。',
+        ].filter(Boolean).join(' ');
+      }
+
+      if (layoutId === 'image_full' && isMechanicalHydraulicTopic) {
+        return [
+          '任务：为PPT生成工程机理主场景图，必须与当前页讲解的液压/机械故障机制直接对应。',
+          topicLine,
+          annotationLine,
+          industrialMismatchGuard,
+          '核心要求：主体必须是液压元件、流道、泵阀、叶轮、金属表面或剖视结构本体，不要用抽象泡泡隐喻替代真实机构。',
+          '如果页面涉及气穴、空蚀、汽蚀，应清楚表现局部低压导致气泡形成、气泡溃灭冲击金属表面、表面点蚀或疲劳剥落的工程机制。',
+          '构图要求：优先采用工程剖面、透明示意、近景特写或故障诊断视角，避免无关白底、医学设备感、生活方式照片。',
+          '严禁：图片中出现任何文字、数字、字母、Logo、水印、标签、标注、测量刻度、指示箭头带文字。',
+        ].filter(Boolean).join(' ');
+      }
+
       return [
         '任务：为PPT生成“内容解释型配图”，目标是帮助观众理解页面知识点。',
         topicLine,
+        annotationLine,
+        industrialMismatchGuard,
         getLayoutIntent(layoutId, slotPath),
         '目标：图像用于讲解辅助，不是装饰背景，需可读可讲。',
         '构图要求：主体明确，包含2-4个与主题强相关的具体元素，避免大面积空白。',
-        '禁止：文字、数字、Logo、水印、纯抽象渐变、纯装饰边框、无意义背景纹理。',
+        '严禁：图片中出现任何文字、数字、字母、Logo、水印、标签、标注、测量刻度、指示箭头带文字。图片必须是纯视觉内容，所有文字说明应在PPT页面上叠加，而非在图片中。',
       ].join(' ');
     };
 
@@ -754,15 +939,17 @@ export const SlidePreview: React.FC = () => {
       const payload = convertPageToPayload(page, index);
       if (!payload) return;
 
-      const model = payload.model as any;
-      const layoutId = normalizeLayoutId(payload.layout_id as LayoutId) as any;
+      const resolved = resolveThemeLayout(payload.layout_id as LayoutId, payload.model as any, htmlTheme);
+      const model = resolved.model as any;
+      const layoutId = resolved.layoutId as any;
       const pageId = payload.page_id;
       const schemeId = currentProject?.scheme_id || 'edu_dark';
       const push = (slotPath: string) => {
         const facts = collectPageFacts(page, model);
+        const annotationTargets = collectAnnotationTargets(model);
         const pageTitle = cleanText(model?.title) || cleanText(page?.outline_content?.title) || '';
         const visualGoal = getLayoutIntent(layoutId, slotPath);
-        const prompt = getPrompt(layoutId, slotPath, facts);
+        const prompt = getPrompt(layoutId, slotPath, facts, annotationTargets);
         slots.push({
           page_id: pageId,
           slot_path: slotPath,
@@ -778,6 +965,7 @@ export const SlidePreview: React.FC = () => {
             extra_requirements: cleanText(currentProject?.extra_requirements || ''),
             template_style: cleanText(currentProject?.template_style || ''),
             visual_goal: visualGoal,
+            annotation_targets: annotationTargets,
           },
         });
       };
@@ -785,7 +973,9 @@ export const SlidePreview: React.FC = () => {
       const descriptors = collectHtmlImageSlotDescriptors(layoutId, model, {
         optionalImageEnabled: shouldUseOptionalImageSlot(page, model),
         inferTwoColumnPartType,
-        variantId: resolveLayoutVariant(
+        theme: htmlTheme,
+        variantId: resolvePageVariant(
+          page.id || page.page_id || pageId,
           model,
           typeof page.outline_content?.layout_variant === 'string'
             ? page.outline_content.layout_variant
@@ -803,7 +993,8 @@ export const SlidePreview: React.FC = () => {
     convertPageToPayload,
     inferTwoColumnPartType,
     shouldUseOptionalImageSlot,
-    resolveLayoutVariant,
+    resolvePageVariant,
+    htmlTheme,
     currentProject?.scheme_id,
     currentProject?.idea_prompt,
     currentProject?.extra_requirements,
@@ -932,36 +1123,33 @@ export const SlidePreview: React.FC = () => {
       .filter((p): p is PagePayload => p !== null);
   }, [isHtmlMode, currentProject?.pages, convertPageToPayload]);
 
-  // HTML模式下载功能
-  const handleDownloadHTMLSlides = useCallback(() => {
-    if (!currentProject || !isHtmlMode || allPagesPayload.length === 0) return;
-    const slidesHTML = allPagesPayload.map((page) =>
-      renderLayoutHTML(normalizeLayoutId(page.layout_id as LayoutId), page.model, htmlTheme)
-    );
-    const html = generateHTMLDocument(slidesHTML, htmlTheme, {
-      project_id: currentProject.id || '',
-      ppt_meta: {
-        title: currentProject.idea_prompt || 'Presentation',
-        theme_id: htmlTheme.id,
-        aspect_ratio: '16:9',
-      },
-      pages: allPagesPayload,
-    });
-    const filename = `${currentProject.idea_prompt || 'presentation'}.html`;
-    downloadHTML(html, filename);
-  }, [currentProject, isHtmlMode, allPagesPayload, htmlTheme]);
-
-  // 上传 HTML 到同域服务器获取在线链接（避免跨域问题）
-  const handleUploadHTML = useCallback(async (options?: { silent?: boolean }): Promise<string | null> => {
-    if (!currentProject || !isHtmlMode || allPagesPayload.length === 0) {
-      notify('暂无内容可上传', 'info');
-      return null;
+  const buildSelfContainedPagesToExport = useCallback(async (): Promise<PagePayload[]> => {
+    if (!currentProject || !isHtmlMode) {
+      return [];
     }
 
-    setIsUploadingHtml(true);
+    const pagesToExport = currentProject.pages
+      .map((page, index) => convertPageToPayload(page, index))
+      .filter((p): p is PagePayload => p !== null);
+
+    if (pagesToExport.length === 0) {
+      return [];
+    }
+
+    return inlinePagePayloadModels(pagesToExport);
+  }, [currentProject, isHtmlMode, convertPageToPayload]);
+
+  // HTML模式下载功能
+  const handleDownloadHTMLSlides = useCallback(async () => {
+    if (!currentProject || !isHtmlMode) return;
+
+    // 导出时直接从 currentProject.pages 重新计算，确保使用最新的变体设置
+    // 避免使用可能被 syncProject 覆盖的 allPagesPayload 缓存
     try {
-      // 生成 HTML 内容
-      const slidesHTML = allPagesPayload.map((page) =>
+      const pagesToExport = await buildSelfContainedPagesToExport();
+      if (pagesToExport.length === 0) return;
+
+      const slidesHTML = pagesToExport.map((page) =>
         renderLayoutHTML(normalizeLayoutId(page.layout_id as LayoutId), page.model, htmlTheme)
       );
       const html = generateHTMLDocument(slidesHTML, htmlTheme, {
@@ -971,7 +1159,45 @@ export const SlidePreview: React.FC = () => {
           theme_id: htmlTheme.id,
           aspect_ratio: '16:9',
         },
-        pages: allPagesPayload,
+        pages: pagesToExport,
+      });
+      const filename = `${currentProject.idea_prompt || 'presentation'}.html`;
+      downloadHTML(html, filename);
+    } catch (error) {
+      console.error('下载 HTML 幻灯片失败:', error);
+      notify('下载 HTML 幻灯片失败', 'error');
+    }
+  }, [currentProject, isHtmlMode, buildSelfContainedPagesToExport, htmlTheme, notify]);
+
+  // 上传 HTML 到同域服务器获取在线链接（避免跨域问题）
+  const handleUploadHTML = useCallback(async (options?: { silent?: boolean }): Promise<string | null> => {
+    if (!currentProject || !isHtmlMode) {
+      notify('暂无内容可上传', 'info');
+      return null;
+    }
+
+    // 上传时直接从 currentProject.pages 重新计算，确保使用最新的变体设置
+    const pagesToExport = await buildSelfContainedPagesToExport();
+
+    if (pagesToExport.length === 0) {
+      notify('暂无内容可上传', 'info');
+      return null;
+    }
+
+    setIsUploadingHtml(true);
+    try {
+      // 生成 HTML 内容
+      const slidesHTML = pagesToExport.map((page) =>
+        renderLayoutHTML(normalizeLayoutId(page.layout_id as LayoutId), page.model, htmlTheme)
+      );
+      const html = generateHTMLDocument(slidesHTML, htmlTheme, {
+        project_id: currentProject.id || '',
+        ppt_meta: {
+          title: currentProject.idea_prompt || 'Presentation',
+          theme_id: htmlTheme.id,
+          aspect_ratio: '16:9',
+        },
+        pages: pagesToExport,
       });
 
       // 生成文件名（带时间戳）
@@ -1021,7 +1247,7 @@ export const SlidePreview: React.FC = () => {
     } finally {
       setIsUploadingHtml(false);
     }
-  }, [currentProject, isHtmlMode, allPagesPayload, htmlTheme, show]);
+  }, [currentProject, isHtmlMode, buildSelfContainedPagesToExport, htmlTheme, notify]);
 
   // 复制链接到剪贴板
   const handleCopyUrl = useCallback(async () => {
@@ -1040,6 +1266,14 @@ export const SlidePreview: React.FC = () => {
       notify('链接已复制', 'success');
     }
   }, [uploadedHtmlUrl, show]);
+
+  useEffect(() => {
+    if (!uploadedHtmlUrl) {
+      return;
+    }
+
+    setUploadedHtmlUrl(null);
+  }, [currentProject?.id, currentProject?.pages, htmlPageImages, htmlGlobalBackground, htmlTheme.id]);
 
   // 加载项目数据 & 用户模板
   useEffect(() => {
@@ -1118,11 +1352,11 @@ export const SlidePreview: React.FC = () => {
 
       const pageId = page.id;
       const model = page.html_model as unknown as Record<string, unknown>;
-      
+
       // 递归查找所有图片路径
       const findImagePaths = (obj: any, path: string = ''): Array<{ path: string; value: string }> => {
         const results: Array<{ path: string; value: string }> = [];
-        
+
         if (typeof obj === 'string') {
           // 检查是否是图片URL路径（以/files/开头）或base64
           if (obj.startsWith('/files/') || obj.startsWith('http://') || obj.startsWith('https://') || obj.startsWith('data:image/')) {
@@ -1130,7 +1364,7 @@ export const SlidePreview: React.FC = () => {
           }
         } else if (Array.isArray(obj)) {
           obj.forEach((item, index) => {
-            results.push(...findImagePaths(item, path ? `${path}[${index}]` : `[${index}]`));
+            results.push(...findImagePaths(item, path ? `${path}.${index}` : `${index}`));
           });
         } else if (obj && typeof obj === 'object') {
           Object.entries(obj).forEach(([key, value]) => {
@@ -1138,12 +1372,12 @@ export const SlidePreview: React.FC = () => {
             results.push(...findImagePaths(value, newPath));
           });
         }
-        
+
         return results;
       };
 
       const imagePaths = findImagePaths(model);
-      
+
       if (imagePaths.length > 0) {
         restoredImages[pageId] = {};
         imagePaths.forEach(({ path, value }) => {
@@ -1229,10 +1463,20 @@ export const SlidePreview: React.FC = () => {
     if (!currentProject?.pages || !isHtmlMode) return null;
     const page = currentProject.pages[selectedIndex];
     if (!page?.layout_id) return null;
-    const layoutId = normalizeLayoutId(page.layout_id as LayoutId);
-    const pool = VARIANT_POOLS[layoutId] || null;
-    return pool;
-  }, [currentProject?.pages, selectedIndex, isHtmlMode]);
+    const normalizedId = normalizeLayoutId(page.layout_id as LayoutId);
+    // 首先尝试原始布局ID的变体池
+    const pool = VARIANT_POOLS[normalizedId];
+    if (pool) return pool;
+    // 如果没有找到，尝试通过主题解析后的布局ID查找
+    // 这在 warm_edu 主题下很重要，因为 edu_summary 被映射到 vocational_mission_complete
+    const payload = convertPageToPayload(page, selectedIndex);
+    if (payload) {
+      const resolved = resolveThemeLayout(payload.layout_id as LayoutId, payload.model as any, htmlTheme);
+      const resolvedPool = VARIANT_POOLS[resolved.layoutId];
+      if (resolvedPool) return resolvedPool;
+    }
+    return null;
+  }, [currentProject?.pages, selectedIndex, isHtmlMode, convertPageToPayload, htmlTheme]);
 
   const currentPageVariantId = useMemo(() => {
     if (!currentProject?.pages) return 'a';
@@ -1241,9 +1485,9 @@ export const SlidePreview: React.FC = () => {
     const outlineVariant = typeof page?.outline_content?.layout_variant === 'string'
       ? page.outline_content.layout_variant
       : undefined;
-    const variantId = resolveLayoutVariant(model, outlineVariant);
+    const variantId = resolvePageVariant(page.id || page.page_id || '', model, outlineVariant);
     return variantId;
-  }, [currentProject?.pages, resolveLayoutVariant, selectedIndex]);
+  }, [currentProject?.pages, resolvePageVariant, selectedIndex]);
 
   const handleVariantChange = useCallback(async (variantId: string) => {
     if (!currentProject?.pages || !projectId) return;
@@ -1252,10 +1496,19 @@ export const SlidePreview: React.FC = () => {
     if (isVariantUpdating) return;
 
     const existingModel = (page.html_model || {}) as Record<string, unknown>;
-    const currentVariant = resolveLayoutVariant(existingModel);
+    const existingOutline = page.outline_content ? { ...page.outline_content } : undefined;
+    const currentVariant = resolvePageVariant(
+      page.id,
+      existingModel,
+      typeof existingOutline?.layout_variant === 'string' ? existingOutline.layout_variant : undefined,
+    );
     if (currentVariant === variantId) return;
     const updatedModel = { ...existingModel, variant: variantId, layout_variant: variantId };
     const targetPageId = page.id;
+    pageVariantStateRef.current = {
+      ...pageVariantStateRef.current,
+      [targetPageId]: variantId,
+    };
 
     setIsVariantUpdating(true);
 
@@ -1267,7 +1520,13 @@ export const SlidePreview: React.FC = () => {
           ...state.currentProject,
           pages: state.currentProject.pages.map((p) =>
             p.id === targetPageId
-              ? { ...p, html_model: updatedModel as any }
+              ? {
+                ...p,
+                html_model: updatedModel as any,
+                outline_content: p.outline_content
+                  ? { ...p.outline_content, layout_variant: variantId }
+                  : p.outline_content,
+              }
               : p
           ),
         },
@@ -1286,11 +1545,19 @@ export const SlidePreview: React.FC = () => {
               pages: state.currentProject.pages.map((p) =>
                 p.id === targetPageId
                   ? {
-                      ...p,
-                      ...serverPage,
-                      id: serverPage.page_id || serverPage.id || p.id,
-                      generated_image_path: serverPage.generated_image_url || serverPage.generated_image_path || p.generated_image_path,
-                    }
+                    ...p,
+                    ...serverPage,
+                    id: serverPage.page_id || serverPage.id || p.id,
+                    generated_image_path: serverPage.generated_image_url || serverPage.generated_image_path || p.generated_image_path,
+                    outline_content: serverPage.outline_content
+                      ? { ...serverPage.outline_content, layout_variant: variantId }
+                      : (p.outline_content ? { ...p.outline_content, layout_variant: variantId } : p.outline_content),
+                    // 确保 html_model 中的变体信息被正确保留
+                    // 服务器返回的 html_model 可能不包含变体字段，需要与本地更新的模型合并
+                    html_model: serverPage.html_model
+                      ? { ...serverPage.html_model, variant: variantId, layout_variant: variantId }
+                      : updatedModel,
+                  }
                   : p
               ),
             },
@@ -1299,6 +1566,16 @@ export const SlidePreview: React.FC = () => {
       }
     } catch (error) {
       console.error('Failed to switch variant:', error);
+      if (currentVariant) {
+        pageVariantStateRef.current = {
+          ...pageVariantStateRef.current,
+          [targetPageId]: currentVariant,
+        };
+      } else {
+        const nextVariantState = { ...pageVariantStateRef.current };
+        delete nextVariantState[targetPageId];
+        pageVariantStateRef.current = nextVariantState;
+      }
       // Revert optimistic update on failure (only target page)
       useProjectStore.setState((state) => {
         if (!state.currentProject) return state;
@@ -1307,7 +1584,11 @@ export const SlidePreview: React.FC = () => {
             ...state.currentProject,
             pages: state.currentProject.pages.map((p) =>
               p.id === targetPageId
-                ? { ...p, html_model: existingModel as any }
+                ? {
+                  ...p,
+                  html_model: existingModel as any,
+                  outline_content: existingOutline as any,
+                }
                 : p
             ),
           },
@@ -1317,7 +1598,7 @@ export const SlidePreview: React.FC = () => {
     } finally {
       setIsVariantUpdating(false);
     }
-  }, [currentProject, selectedIndex, projectId, notify, isVariantUpdating, resolveLayoutVariant]);
+  }, [currentProject, selectedIndex, projectId, notify, isVariantUpdating, resolvePageVariant]);
 
   const handleGenerateAll = async () => {
     const pageIds = getSelectedPageIdsForExport();
@@ -1585,7 +1866,7 @@ export const SlidePreview: React.FC = () => {
     }
   }, [currentProject, isHtmlMode, show, buildHtmlBackgroundSlots]);
 
-  
+
 
   const handleUploadBackground = useCallback(() => {
     setBackgroundPickerMode('menu');
@@ -2079,27 +2360,23 @@ export const SlidePreview: React.FC = () => {
 
     try {
       if (type === 'pptx') {
-        // 自动上传 HTML 获取在线链接，再调用导出
-        let htmlUrl = uploadedHtmlUrl;
-        
-        if (!htmlUrl) {
-          notify('正在生成在线链接...', 'info');
-          htmlUrl = await handleUploadHTML({ silent: true });
-        }
-        
+        // 每次导出 PPTX 都重新生成最新 HTML，避免复用过期的缓存链接
+        notify('正在生成最新在线链接...', 'info');
+        const htmlUrl = await handleUploadHTML({ silent: true });
+
         if (!htmlUrl) {
           notify('获取在线链接失败，请重试', 'error');
           return;
         }
-        
+
         // 检查外部脚本加载状态
         const generator = (window as any).generateHighFidelityPPT;
-        
+
         if (typeof generator !== 'function') {
           notify('未检测到 PPTX 导出脚本，请检查 HTMLtoPPT.js 是否加载', 'error');
           return;
         }
-        
+
         try {
           generator(htmlUrl);
           notify('正在导出 PPTX...', 'success');
@@ -2300,10 +2577,10 @@ export const SlidePreview: React.FC = () => {
     window.redirect_homepage?.({
       request: '',
       persistent: false,
-      onSuccess: function(response: any) {
+      onSuccess: function (response: any) {
         console.log('返回成功:', response);
       },
-      onFailure: function(_error_code: any, error_message: any) {
+      onFailure: function (_error_code: any, error_message: any) {
         console.error("window.redirect_homepage 请求失败:", error_message);
         alert('返回失败: ' + error_message);
       }
@@ -2431,7 +2708,7 @@ export const SlidePreview: React.FC = () => {
         >
           {currentProject.pages.map((page, index) => (
             <div key={page.id} className="md:w-full flex-shrink-0 relative">
-                  {/* 移动端：简化缩略图 */}
+              {/* 移动端：简化缩略图 */}
               <div className="md:hidden relative">
                 <button
                   onClick={() => {
@@ -2443,7 +2720,7 @@ export const SlidePreview: React.FC = () => {
                     }`}
                 >
                   {isHtmlMode ? (
-                        // HTML模式：显示渲染的缩略图
+                    // HTML模式：显示渲染的缩略图
                     (() => {
                       const payload = convertPageToPayload(page, index);
                       if (payload) {
@@ -2458,7 +2735,6 @@ export const SlidePreview: React.FC = () => {
                               page={payload}
                               theme={htmlTheme}
                               scale={1}
-                              onImageUpload={(slotPath) => triggerImageUpload(slotPath, page.id || payload.page_id)}
                             />
                           </div>
                         );
@@ -2470,22 +2746,22 @@ export const SlidePreview: React.FC = () => {
                       );
                     })()
                   ) : page.generated_image_path ? (
-                        <img
-                          src={getImageUrl(page.generated_image_path, page.updated_at)}
-                          alt={`Slide ${index + 1}`}
-                          className="w-full h-full object-cover rounded"
-                        />
+                    <img
+                      src={getImageUrl(page.generated_image_path, page.updated_at)}
+                      alt={`Slide ${index + 1}`}
+                      className="w-full h-full object-cover rounded"
+                    />
                   ) : (
-                        <div className="w-full h-full bg-gray-100 rounded flex items-center justify-center text-xs text-gray-400">
-                          {index + 1}
-                        </div>
+                    <div className="w-full h-full bg-gray-100 rounded flex items-center justify-center text-xs text-gray-400">
+                      {index + 1}
+                    </div>
                   )}
                 </button>
               </div>
-                  {/* 桌面端：完整卡片 */}
+              {/* 桌面端：完整卡片 */}
               <div className="hidden md:block relative">
                 {isHtmlMode ? (
-                      // HTML模式：使用SlideRenderer渲染缩略图
+                  // HTML模式：使用SlideRenderer渲染缩略图
                   (() => {
                     const payload = convertPageToPayload(page, index);
                     if (payload) {
@@ -2512,7 +2788,6 @@ export const SlidePreview: React.FC = () => {
                               page={payload}
                               theme={htmlTheme}
                               scale={thumbnailScale}
-                              onImageUpload={(slotPath) => triggerImageUpload(slotPath, page.id || payload.page_id)}
                             />
                           </div>
                           <div className="p-2 bg-white">
@@ -2530,7 +2805,7 @@ export const SlidePreview: React.FC = () => {
                     );
                   })()
                 ) : (
-                      // 传统模式：使用SlideCard
+                  // 传统模式：使用SlideCard
                   <SlideCard
                     page={page}
                     index={index}
@@ -2560,159 +2835,159 @@ export const SlidePreview: React.FC = () => {
           onBackToEdit={() => navigate(`/project/${projectId}/outline`)}
         >
           <>
-              {/* 预览区 */}
-              <div className="flex-1 overflow-hidden min-h-0 flex items-center justify-center p-4 md:p-8">
-                <div className="max-w-5xl w-full">
-                  <div
-                    ref={isHtmlMode ? previewContainerRef : undefined}
-                    className="relative aspect-video bg-white rounded-lg shadow-xl overflow-hidden touch-manipulation flex items-center justify-center"
-                  >
-                    {/* HTML渲染模式 */}
-                    {isHtmlMode && selectedPagePayload ? (
-                      <div
-                        style={{
-                          width: htmlTheme.sizes.slideWidth * previewScale,
-                          height: htmlTheme.sizes.slideHeight * previewScale,
-                          flexShrink: 0,
-                        }}
-                      >
-                        <SlideRenderer
-                          page={selectedPagePayload}
-                          theme={htmlTheme}
-                          scale={previewScale}
-                          isSelected={true}
-                          onImageUpload={(slotPath) => triggerImageUpload(slotPath, currentProject.pages[selectedIndex]?.id || selectedPagePayload.page_id)}
-                        />
+            {/* 预览区 */}
+            <div className="flex-1 overflow-hidden min-h-0 flex items-center justify-center p-4 md:p-8">
+              <div className="max-w-5xl w-full">
+                <div
+                  ref={isHtmlMode ? previewContainerRef : undefined}
+                  className="relative aspect-video bg-white rounded-lg shadow-xl overflow-hidden touch-manipulation flex items-center justify-center"
+                >
+                  {/* HTML渲染模式 */}
+                  {isHtmlMode && selectedPagePayload ? (
+                    <div
+                      style={{
+                        width: htmlTheme.sizes.slideWidth * previewScale,
+                        height: htmlTheme.sizes.slideHeight * previewScale,
+                        flexShrink: 0,
+                      }}
+                    >
+                      <SlideRenderer
+                        page={selectedPagePayload}
+                        theme={htmlTheme}
+                        scale={previewScale}
+                        isSelected={true}
+                        onImageUpload={(slotPath) => triggerImageUpload(slotPath, currentProject.pages[selectedIndex]?.id || selectedPagePayload.page_id)}
+                      />
+                    </div>
+                  ) : isHtmlMode ? (
+                    /* HTML模式但没有数据 */
+                    <div className="w-full h-full flex items-center justify-center bg-gray-100">
+                      <div className="text-center">
+                        <p className="text-gray-500 mb-4">
+                          请先在大纲/描述编辑页填写内容
+                        </p>
+                        <Button
+                          variant="primary"
+                          onClick={() => navigate(`/project/${projectId}/detail`)}
+                        >
+                          编辑内容
+                        </Button>
                       </div>
-                    ) : isHtmlMode ? (
-                      /* HTML模式但没有数据 */
-                      <div className="w-full h-full flex items-center justify-center bg-gray-100">
-                        <div className="text-center">
-                          <p className="text-gray-500 mb-4">
-                            请先在大纲/描述编辑页填写内容
-                          </p>
-                          <Button
-                            variant="primary"
-                            onClick={() => navigate(`/project/${projectId}/detail`)}
-                          >
-                            编辑内容
-                          </Button>
+                    </div>
+                  ) : selectedPage?.generated_image_path ? (
+                    /* 传统图片模式：显示生成的图片 */
+                    <div className="relative w-full h-full group">
+                      <img
+                        src={imageUrl}
+                        alt={`Slide ${selectedIndex + 1}`}
+                        className="w-full h-full object-contain select-none"
+                        draggable={false}
+                      />
+                      {/* 重新生成按钮 - 悬浮在右上角 */}
+                      {(!selectedPage?.id || !pageGeneratingTasks[selectedPage.id]) &&
+                        selectedPage?.status !== 'GENERATING' && (
+                          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              onClick={handleRegeneratePage}
+                              className="shadow-lg"
+                              disabled={!!pageGeneratingTasks[selectedPage?.id || '']}
+                            >
+                              <RefreshCw className="w-4 h-4 mr-1" />
+                              重新生成
+                            </Button>
+                          </div>
+                        )}
+                      {/* 生成中状态提示 */}
+                      {(selectedPage?.id && pageGeneratingTasks[selectedPage.id]) ||
+                        selectedPage?.status === 'GENERATING' ? (
+                        <div className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm px-3 py-2 rounded-lg shadow-lg flex items-center gap-2">
+                          <Loader2 className="w-4 h-4 animate-spin text-banana-600" />
+                          <span className="text-sm text-gray-700">正在生成中...</span>
                         </div>
-                      </div>
-                    ) : selectedPage?.generated_image_path ? (
-                      /* 传统图片模式：显示生成的图片 */
-                      <div className="relative w-full h-full group">
-                        <img
-                          src={imageUrl}
-                          alt={`Slide ${selectedIndex + 1}`}
-                          className="w-full h-full object-contain select-none"
-                          draggable={false}
-                        />
-                        {/* 重新生成按钮 - 悬浮在右上角 */}
+                      ) : null}
+                    </div>
+                  ) : (
+                    /* 传统模式但没有图片 */
+                    <div className="w-full h-full flex items-center justify-center bg-gray-100">
+                      <div className="text-center">
+                        <p className="text-gray-500 mb-4">
+                          {selectedPage?.id && pageGeneratingTasks[selectedPage.id]
+                            ? '正在生成中...'
+                            : selectedPage?.status === 'GENERATING'
+                              ? '正在生成中...'
+                              : selectedPage?.status === 'FAILED'
+                                ? '生成失败，请重试'
+                                : '尚未生成图片'}
+                        </p>
                         {(!selectedPage?.id || !pageGeneratingTasks[selectedPage.id]) &&
                           selectedPage?.status !== 'GENERATING' && (
-                            <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                              <Button
-                                variant="primary"
-                                size="sm"
-                                onClick={handleRegeneratePage}
-                                className="shadow-lg"
-                                disabled={!!pageGeneratingTasks[selectedPage?.id || '']}
-                              >
-                                <RefreshCw className="w-4 h-4 mr-1" />
-                                重新生成
-                              </Button>
-                            </div>
+                            <Button
+                              variant="primary"
+                              onClick={handleRegeneratePage}
+                            >
+                              {selectedPage?.status === 'FAILED' ? '再次生成此页' : '生成此页'}
+                            </Button>
                           )}
-                        {/* 生成中状态提示 */}
-                        {(selectedPage?.id && pageGeneratingTasks[selectedPage.id]) ||
-                        selectedPage?.status === 'GENERATING' ? (
-                          <div className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm px-3 py-2 rounded-lg shadow-lg flex items-center gap-2">
-                            <Loader2 className="w-4 h-4 animate-spin text-banana-600" />
-                            <span className="text-sm text-gray-700">正在生成中...</span>
-                          </div>
-                        ) : null}
                       </div>
-                    ) : (
-                      /* 传统模式但没有图片 */
-                      <div className="w-full h-full flex items-center justify-center bg-gray-100">
-                        <div className="text-center">
-                          <p className="text-gray-500 mb-4">
-                            {selectedPage?.id && pageGeneratingTasks[selectedPage.id]
-                              ? '正在生成中...'
-                              : selectedPage?.status === 'GENERATING'
-                                ? '正在生成中...'
-                                : selectedPage?.status === 'FAILED'
-                                  ? '生成失败，请重试'
-                                  : '尚未生成图片'}
-                          </p>
-                          {(!selectedPage?.id || !pageGeneratingTasks[selectedPage.id]) &&
-                            selectedPage?.status !== 'GENERATING' && (
-                              <Button
-                                variant="primary"
-                                onClick={handleRegeneratePage}
-                              >
-                                {selectedPage?.status === 'FAILED' ? '再次生成此页' : '生成此页'}
-                              </Button>
-                            )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
               </div>
+            </div>
 
-              <SlidePreviewFooter
-                selectedIndex={selectedIndex}
-                totalPages={currentProject.pages.length}
-                onPrevious={() => setSelectedIndex(Math.max(0, selectedIndex - 1))}
-                onNext={() => setSelectedIndex(Math.min(currentProject.pages.length - 1, selectedIndex + 1))}
-                variants={currentPageVariants ?? undefined}
-                currentVariant={currentPageVariantId}
-                onVariantChange={handleVariantChange}
-                isVariantUpdating={isVariantUpdating}
-                versionMenu={imageVersions.length > 1 ? (
-                  <div className="relative">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setShowVersionMenu(!showVersionMenu)}
-                      className="text-xs md:text-sm"
-                    >
-                      <span className="hidden md:inline">历史版本 ({imageVersions.length})</span>
-                      <span className="md:hidden">版本</span>
-                    </Button>
-                    {showVersionMenu && (
-                      <div className="absolute right-0 bottom-full mb-2 w-56 md:w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-40 max-h-96 overflow-y-auto">
-                        {imageVersions.map((version) => (
-                          <button
-                            key={version.version_id}
-                            onClick={() => handleSwitchVersion(version.version_id)}
-                            className={`w-full px-3 md:px-4 py-2 text-left hover:bg-gray-50 transition-colors flex items-center justify-between text-xs md:text-sm ${version.is_current ? 'bg-banana-50' : ''}`}
-                          >
-                            <div className="flex items-center gap-2">
-                              <span>版本 {version.version_number}</span>
-                              {version.is_current && (
-                                <span className="text-xs text-banana-600 font-medium">(当前)</span>
-                              )}
-                            </div>
-                            <span className="text-xs text-gray-400 hidden md:inline">
-                              {version.created_at
-                                ? new Date(version.created_at).toLocaleString('zh-CN', {
-                                  month: 'short',
-                                  day: 'numeric',
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                })
-                                : ''}
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ) : null}
-              />
+            <SlidePreviewFooter
+              selectedIndex={selectedIndex}
+              totalPages={currentProject.pages.length}
+              onPrevious={() => setSelectedIndex(Math.max(0, selectedIndex - 1))}
+              onNext={() => setSelectedIndex(Math.min(currentProject.pages.length - 1, selectedIndex + 1))}
+              variants={currentPageVariants ?? undefined}
+              currentVariant={currentPageVariantId}
+              onVariantChange={handleVariantChange}
+              isVariantUpdating={isVariantUpdating}
+              versionMenu={imageVersions.length > 1 ? (
+                <div className="relative">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowVersionMenu(!showVersionMenu)}
+                    className="text-xs md:text-sm"
+                  >
+                    <span className="hidden md:inline">历史版本 ({imageVersions.length})</span>
+                    <span className="md:hidden">版本</span>
+                  </Button>
+                  {showVersionMenu && (
+                    <div className="absolute right-0 bottom-full mb-2 w-56 md:w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-40 max-h-96 overflow-y-auto">
+                      {imageVersions.map((version) => (
+                        <button
+                          key={version.version_id}
+                          onClick={() => handleSwitchVersion(version.version_id)}
+                          className={`w-full px-3 md:px-4 py-2 text-left hover:bg-gray-50 transition-colors flex items-center justify-between text-xs md:text-sm ${version.is_current ? 'bg-banana-50' : ''}`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span>版本 {version.version_number}</span>
+                            {version.is_current && (
+                              <span className="text-xs text-banana-600 font-medium">(当前)</span>
+                            )}
+                          </div>
+                          <span className="text-xs text-gray-400 hidden md:inline">
+                            {version.created_at
+                              ? new Date(version.created_at).toLocaleString('zh-CN', {
+                                month: 'short',
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })
+                              : ''}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : null}
+            />
           </>
         </SlidePreviewStage>
       </div>

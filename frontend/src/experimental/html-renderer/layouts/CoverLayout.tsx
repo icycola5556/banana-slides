@@ -126,16 +126,16 @@ export function renderCoverLayoutHTML(model: CoverModel, theme: ThemeConfig): st
   const titleStyle = toInlineStyle({
     fontSize: '52px',
     fontWeight: 'bold',
-    color: '#ffffff',
+    color: background_image ? '#111111' : '#ffffff',
     margin: '0',
     lineHeight: '1.2',
-    textShadow: '0 2px 4px rgba(0,0,0,0.2)',
+    textShadow: background_image ? '0 1px 3px rgba(255,255,255,0.8)' : '0 2px 4px rgba(0,0,0,0.2)',
     fontFamily: theme.fonts.title,
   });
 
   const subtitleStyle = toInlineStyle({
     fontSize: '28px',
-    color: 'rgba(255,255,255,0.9)',
+    color: background_image ? '#333333' : 'rgba(255,255,255,0.9)',
     margin: '0',
     marginTop: '20px',
     lineHeight: '1.4',
@@ -151,7 +151,7 @@ export function renderCoverLayoutHTML(model: CoverModel, theme: ThemeConfig): st
 
   const authorStyle = toInlineStyle({
     fontSize: '20px',
-    color: 'rgba(255,255,255,0.8)',
+    color: background_image ? '#333333' : 'rgba(255,255,255,0.8)',
     margin: '0',
     marginTop: '40px',
     lineHeight: '1.6',

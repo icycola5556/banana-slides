@@ -78,6 +78,17 @@ async def update_page(
 
     if req.html_model is not None:
         page.set_html_model(req.html_model)
+        if isinstance(req.html_model, dict):
+            variant = str(
+                req.html_model.get("layout_variant")
+                or req.html_model.get("variant")
+                or ""
+            ).strip().lower()
+            if variant:
+                outline_content = page.get_outline_content()
+                if isinstance(outline_content, dict):
+                    outline_content["layout_variant"] = variant
+                    page.set_outline_content(outline_content)
     if req.layout_id is not None:
         page.layout_id = req.layout_id
     if req.status is not None:

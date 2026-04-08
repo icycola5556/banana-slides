@@ -16,12 +16,13 @@ import {
 interface PortfolioLayoutProps {
   model: PortfolioModel;
   theme: ThemeConfig;
+  onImageUpload?: (slotPath: string) => void;
 }
 
 const asStyle = (styles: Record<string, string | number | undefined>): React.CSSProperties =>
   styles as React.CSSProperties;
 
-export const PortfolioLayout: React.FC<PortfolioLayoutProps> = ({ model, theme }) => {
+export const PortfolioLayout: React.FC<PortfolioLayoutProps> = ({ model, theme, onImageUpload }) => {
   const { title, subtitle, items, layout, background_image } = model;
 
   const slideStyle: React.CSSProperties = {
@@ -91,6 +92,7 @@ export const PortfolioLayout: React.FC<PortfolioLayoutProps> = ({ model, theme }
                   theme={theme}
                   slotLabel="作品图插槽"
                   slotHint="建议放置案例效果图、界面截图或项目实拍图。"
+                  onClick={onImageUpload ? () => onImageUpload(`items.${index}.image_src`) : undefined}
                   frameStyle={{ width: '100%', height: '100%' }}
                   imageStyle={{ width: '100%', height: '100%', objectFit: 'cover' }}
                 />

@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { ImageSlotFrame } from '@/experimental/html-renderer/components/ImageSlotFrame';
 import { getThemeByScheme } from '@/experimental/html-renderer/themes';
@@ -35,5 +35,25 @@ describe('ImageSlotFrame', () => {
 
     expect(screen.getByText('配图插槽')).toBeInTheDocument();
     expect(screen.getByText('图片加载失败，当前展示插槽位置')).toBeInTheDocument();
+  });
+
+  it('keeps generated images replaceable when an upload handler exists', () => {
+    const handleClick = vi.fn();
+
+    render(
+      <ImageSlotFrame
+        src="https://example.com/generated-image.png"
+        alt="generated"
+        theme={theme}
+        slotLabel="实训配图槽位"
+        onClick={handleClick}
+      />
+    );
+
+    expect(screen.getByText('点击替换图片')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('image-slot-frame'));
+
+    expect(handleClick).toHaveBeenCalledTimes(1);
   });
 });

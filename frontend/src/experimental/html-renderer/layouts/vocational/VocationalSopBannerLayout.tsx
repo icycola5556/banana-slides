@@ -13,11 +13,103 @@ import {
 const asStyle = (styles: Record<string, string | number | undefined>): React.CSSProperties =>
   styles as React.CSSProperties;
 
+type ResolvedStep = {
+  number: number;
+  label: string;
+  description?: string;
+};
+
+const readText = (value: unknown): string =>
+  typeof value === 'string' ? value.trim() : '';
+
+const asList = (value: unknown): any[] => {
+  if (Array.isArray(value)) {
+    return value;
+  }
+
+  return value == null ? [] : [value];
+};
+
+const isResolvedStep = (value: ResolvedStep | null): value is ResolvedStep => value !== null;
+
+const resolveSteps = (model: Record<string, unknown>): ResolvedStep[] => {
+  const directSteps = asList(model.steps)
+    .map((step, index) => {
+      if (!step || typeof step !== 'object') {
+        const label = readText(step);
+        return label ? { number: index + 1, label } : null;
+      }
+
+      const item = step as Record<string, unknown>;
+      const label =
+        readText(item.label)
+        || readText(item.title)
+        || readText(item.text)
+        || readText(item.name);
+      const description = readText(item.description) || readText(item.note) || undefined;
+      const number = typeof item.number === 'number' ? item.number : index + 1;
+
+      if (!label && !description) {
+        return null;
+      }
+
+      return {
+        number,
+        label: label || `STEP ${index + 1}`,
+        description,
+      };
+    })
+    .filter(isResolvedStep);
+
+  if (directSteps.length > 0) {
+    return directSteps;
+  }
+
+  return [
+    ...asList(model.bullets),
+    ...asList(model.content),
+  ]
+    .map((item, index) => {
+      if (typeof item === 'string') {
+        const label = item.trim();
+        return label ? { number: index + 1, label } : null;
+      }
+
+      if (!item || typeof item !== 'object') {
+        return null;
+      }
+
+      const raw = item as Record<string, unknown>;
+      const label =
+        readText(raw.text)
+        || readText(raw.title)
+        || readText(raw.label)
+        || readText(raw.name);
+      const description =
+        readText(raw.description)
+        || readText(raw.note)
+        || asList(raw.points).map(readText).filter(Boolean).join(' // ')
+        || undefined;
+
+      if (!label && !description) {
+        return null;
+      }
+
+      return {
+        number: index + 1,
+        label: label || `STEP ${index + 1}`,
+        description,
+      };
+    })
+    .filter(isResolvedStep);
+};
+
 export const VocationalSopBannerLayout: React.FC<{
   model: ProcessStepsModel;
   theme: ThemeConfig;
 }> = ({ model, theme }) => {
-  const { title, subtitle, steps, background_image } = model;
+  const { title, subtitle, background_image } = model;
+  const steps = resolveSteps(model as unknown as Record<string, unknown>);
   
   // 深空灰背景与亮黄色对比
   const bgColor = theme.colors.background === '#ffffff' ? '#090A0E' : theme.colors.background;
@@ -134,7 +226,8 @@ export const VocationalSopBannerLayout: React.FC<{
 };
 
 export function renderVocationalSopBannerLayoutHTML(model: any, theme: ThemeConfig): string {
-  const { title, subtitle, steps, background_image } = model;
+  const { title, subtitle, background_image } = model;
+  const steps = resolveSteps(model as Record<string, unknown>);
   
   const bgColor = theme.colors.background === '#ffffff' ? '#090A0E' : theme.colors.background;
   const accentColor = '#FFDD00';

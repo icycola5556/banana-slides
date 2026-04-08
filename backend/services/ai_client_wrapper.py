@@ -281,8 +281,8 @@ class AIClientWrapper:
 AI_CLIENT_PRESETS = {
     "openai_text": AIClientConfig(
         circuit_breaker=CircuitBreakerConfig(
-            failure_threshold=5,
-            recovery_timeout=60.0,
+            failure_threshold=10,
+            recovery_timeout=30.0,
         ),
         retry=RetryConfig(
             max_attempts=3,
@@ -294,20 +294,20 @@ AI_CLIENT_PRESETS = {
     ),
     "openai_image": AIClientConfig(
         circuit_breaker=CircuitBreakerConfig(
-            failure_threshold=3,
-            recovery_timeout=120.0,
+            failure_threshold=10,
+            recovery_timeout=60.0,
         ),
         retry=RetryConfig(
             max_attempts=2,
             base_delay=2.0,
             retryable_exceptions=(Exception,),
         ),
-        max_concurrent=5,
-        timeout=120.0,
+        max_concurrent=10,
+        timeout=60.0,
     ),
     "qwen_text": AIClientConfig(
         circuit_breaker=CircuitBreakerConfig(
-            failure_threshold=5,
+            failure_threshold=10,
             recovery_timeout=60.0,
         ),
         retry=RetryConfig(
@@ -319,15 +319,15 @@ AI_CLIENT_PRESETS = {
     ),
     "qwen_image": AIClientConfig(
         circuit_breaker=CircuitBreakerConfig(
-            failure_threshold=3,
-            recovery_timeout=180.0,
+            failure_threshold=8,
+            recovery_timeout=120.0,
         ),
         retry=RetryConfig(
             max_attempts=2,
             base_delay=3.0,
         ),
-        max_concurrent=3,
-        timeout=180.0,
+        max_concurrent=5,
+        timeout=120.0,
     ),
 }
 

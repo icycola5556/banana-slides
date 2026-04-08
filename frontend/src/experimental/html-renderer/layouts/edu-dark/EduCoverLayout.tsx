@@ -158,6 +158,7 @@ export const EduCoverLayout: React.FC<EduCoverLayoutProps> = ({ model, theme, on
             theme={theme}
             slotLabel="封面主体插槽"
             slotHint="建议使用透明主体图或高冲击视觉主图，默认居中裁切。"
+            onClick={onImageUpload}
             frameStyle={{ width: '100%', height: '100%', borderRadius: 0 }}
             imageStyle={{
               width: '100%',

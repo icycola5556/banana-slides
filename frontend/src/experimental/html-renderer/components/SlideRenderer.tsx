@@ -158,7 +158,7 @@ import {
   VaultCompareLayout,
   VaultDebriefLayout,
 } from '../layouts/vault';
-import { getLayoutDisplayName, normalizeLayoutId } from '../layouts';
+import { getLayoutDisplayName, normalizeLayoutId, resolveThemeLayout } from '../layouts';
 
 interface SlideRendererProps {
   page: PagePayload;
@@ -168,6 +168,42 @@ interface SlideRendererProps {
   onClick?: () => void;
   isSelected?: boolean;
   onImageUpload?: (slotPath: string) => void; // 图片上传回调，传入 slot 路径
+}
+
+interface LayoutErrorBoundaryProps {
+  children: React.ReactNode;
+  fallback: (error: Error) => React.ReactNode;
+  resetKey: string;
+}
+
+interface LayoutErrorBoundaryState {
+  error: Error | null;
+}
+
+class LayoutErrorBoundary extends React.Component<LayoutErrorBoundaryProps, LayoutErrorBoundaryState> {
+  state: LayoutErrorBoundaryState = { error: null };
+
+  static getDerivedStateFromError(error: Error): LayoutErrorBoundaryState {
+    return { error };
+  }
+
+  componentDidCatch(error: Error) {
+    console.error('[SlideRenderer] Layout boundary caught error:', error);
+  }
+
+  componentDidUpdate(prevProps: LayoutErrorBoundaryProps) {
+    if (prevProps.resetKey !== this.props.resetKey && this.state.error) {
+      this.setState({ error: null });
+    }
+  }
+
+  render() {
+    if (this.state.error) {
+      return this.props.fallback(this.state.error);
+    }
+
+    return this.props.children;
+  }
 }
 
 export const SlideRenderer: React.FC<SlideRendererProps> = ({
@@ -197,7 +233,7 @@ export const SlideRenderer: React.FC<SlideRendererProps> = ({
     );
   }
 
-  const { layout_id, model } = page;
+  const { layout_id, model: rawModel } = page;
 
   // 检查 layout_id
   if (!layout_id) {
@@ -218,7 +254,7 @@ export const SlideRenderer: React.FC<SlideRendererProps> = ({
     );
   }
 
-  let normalizedLayoutId = normalizeLayoutId(layout_id);
+  let normalizedLayoutId = layout_id;
 
   // 针对高职顶级美学模板的运行时特殊路由拦截 (Theme-aware runtime layout substitution)
   if (theme?.id === 'warm_edu') {
@@ -263,7 +299,7 @@ export const SlideRenderer: React.FC<SlideRendererProps> = ({
   }
   
   // 检查 model
-  if (!model) {
+  if (!rawModel) {
     console.error('[SlideRenderer] model is null/undefined, layout_id:', layout_id);
     return (
       <div style={{
@@ -281,6 +317,10 @@ export const SlideRenderer: React.FC<SlideRendererProps> = ({
     );
   }
 
+  const resolved = resolveThemeLayout(layout_id, rawModel, theme);
+  normalizedLayoutId = resolved.layoutId;
+  const model = resolved.model;
+
   const containerStyle: React.CSSProperties = {
     transform: `scale(${scale})`,
     transformOrigin: 'top left',
@@ -295,9 +335,47 @@ export const SlideRenderer: React.FC<SlideRendererProps> = ({
     transition: 'box-shadow 0.2s ease',
   };
 
+  const layoutHostRef = React.useRef<HTMLDivElement | null>(null);
+
+  React.useEffect(() => {
+    const layoutRoot = layoutHostRef.current?.firstElementChild as HTMLElement | null;
+    if (!layoutRoot) {
+      return;
+    }
+
+    const backgroundImage = typeof (model as Record<string, unknown>)?.background_image === 'string'
+      ? ((model as Record<string, unknown>).background_image as string).trim()
+      : '';
+    const shouldInjectBackground =
+      Boolean(backgroundImage)
+      && (normalizedLayoutId.startsWith('blueprint_') || normalizedLayoutId.startsWith('vault_'));
+
+    if (!shouldInjectBackground) {
+      if (layoutRoot.dataset.codexInjectedBackground === '1') {
+        layoutRoot.style.backgroundImage = '';
+        layoutRoot.style.backgroundSize = '';
+        layoutRoot.style.backgroundPosition = '';
+        layoutRoot.style.backgroundRepeat = '';
+        delete layoutRoot.dataset.codexInjectedBackground;
+      }
+      return;
+    }
+
+    const overlay = normalizedLayoutId.startsWith('vault_')
+      ? 'linear-gradient(rgba(0, 5, 15, 0.78), rgba(0, 5, 15, 0.78)), '
+      : 'linear-gradient(rgba(4, 7, 13, 0.72), rgba(4, 7, 13, 0.72)), ';
+
+    layoutRoot.style.backgroundImage = `${overlay}url(${backgroundImage})`;
+    layoutRoot.style.backgroundSize = 'cover';
+    layoutRoot.style.backgroundPosition = 'center';
+    layoutRoot.style.backgroundRepeat = 'no-repeat';
+    layoutRoot.dataset.codexInjectedBackground = '1';
+  }, [model, normalizedLayoutId]);
+
   const renderLayout = () => {
     try {
       console.log('[SlideRenderer] Rendering layout:', normalizedLayoutId, 'model:', model);
+      const enrichedModel = { ...(model as Record<string, unknown>), layoutId: layout_id };
       switch (normalizedLayoutId) {
       case 'cover':
         return <CoverLayout model={model as CoverModel} theme={theme} onImageUpload={onImageUpload ? () => onImageUpload('background_image') : undefined} />;
@@ -348,24 +426,25 @@ export const SlideRenderer: React.FC<SlideRendererProps> = ({
       case 'timeline':
         return <TimelineLayout model={model as TimelineModel} theme={theme} />;
       case 'portfolio':
-        return <PortfolioLayout model={model as PortfolioModel} theme={theme} />;
+        return <PortfolioLayout model={model as PortfolioModel} theme={theme} onImageUpload={onImageUpload} />;
 
       // 实践方案专属布局
       case 'safety_notice':
         return <SafetyNoticeLayout model={model as SafetyNoticeModel} theme={theme} />;
       case 'detail_zoom':
-        return <DetailZoomLayout model={model as DetailZoomModel} theme={theme} />;
+        return <DetailZoomLayout model={model as DetailZoomModel} theme={theme} onImageUpload={onImageUpload ? () => onImageUpload('image_src') : undefined} />;
       case 'vocational_bullets':
         return (
           <VocationalBulletsLayout
-            model={{ ...(model as TitleBulletsModel), layoutId: layout_id } as TitleBulletsModel}
+            model={enrichedModel as unknown as TitleBulletsModel}
             theme={theme}
+            onImageUpload={onImageUpload ? () => onImageUpload('image.src') : undefined}
           />
         );
       case 'vocational_content':
         return (
           <VocationalContentLayout
-            model={{ ...(model as TitleContentModel), layoutId: layout_id } as TitleContentModel}
+            model={enrichedModel as unknown as TitleContentModel}
             theme={theme}
             onImageUpload={onImageUpload ? () => onImageUpload('image.src') : undefined}
           />
@@ -373,7 +452,7 @@ export const SlideRenderer: React.FC<SlideRendererProps> = ({
       case 'vocational_comparison':
         return (
           <VocationalComparisonLayout
-            model={{ ...(model as TwoColumnModel), layoutId: layout_id } as TwoColumnModel}
+            model={enrichedModel as unknown as TwoColumnModel}
             theme={theme}
             onImageUpload={onImageUpload}
           />
@@ -381,45 +460,46 @@ export const SlideRenderer: React.FC<SlideRendererProps> = ({
       case 'vocational_sop_banner':
         return (
           <VocationalSopBannerLayout
-            model={{ ...(model as ProcessStepsModel), layoutId: layout_id } as ProcessStepsModel}
+            model={enrichedModel as unknown as ProcessStepsModel}
             theme={theme}
           />
         );
       case 'vocational_warning_split':
         return (
           <VocationalWarningSplitLayout
-            model={{ ...(model as TwoColumnModel), layoutId: layout_id } as TwoColumnModel}
+            model={enrichedModel as unknown as TwoColumnModel}
             theme={theme}
           />
         );
       case 'vocational_blueprint_zoom':
         return (
           <VocationalBlueprintZoomLayout
-            model={{ ...(model as DetailZoomModel), layoutId: layout_id } as DetailZoomModel}
+            model={enrichedModel as unknown as DetailZoomModel}
             theme={theme}
+            onImageUpload={onImageUpload ? () => onImageUpload('image_src') : undefined}
           />
         );
       case 'vocational_piv_hud':
         return (
           <VocationalPivHudLayout
-            model={{ ...(model as EduDataBoardModel), layoutId: layout_id } as EduDataBoardModel}
+            model={enrichedModel as unknown as EduDataBoardModel}
             theme={theme}
           />
         );
       case 'vocational_intro_cover':
-        return <VocationalIntroCoverLayout model={model as CoverModel} theme={theme} />;
+        return <VocationalIntroCoverLayout model={model as CoverModel} theme={theme} onImageUpload={onImageUpload ? () => onImageUpload('background_image') : undefined} />;
       case 'vocational_mission_toc':
         return <VocationalMissionTocLayout model={model as TocModel} theme={theme} />;
       case 'vocational_target_lock':
-        return <VocationalTargetLockLayout model={{ ...(model as TitleBulletsModel), layoutId: layout_id } as TitleBulletsModel} theme={theme} />;
+        return <VocationalTargetLockLayout model={enrichedModel as unknown as TitleBulletsModel} theme={theme} />;
       case 'vocational_safety_check':
-        return <VocationalSafetyCheckLayout model={{ ...(model as TitleBulletsModel), layoutId: layout_id } as TitleBulletsModel} theme={theme} />;
+        return <VocationalSafetyCheckLayout model={enrichedModel as unknown as TitleBulletsModel} theme={theme} />;
       case 'vocational_equipment_grid':
-        return <VocationalEquipmentGridLayout model={{ ...(model as TitleBulletsModel), layoutId: layout_id } as TitleBulletsModel} theme={theme} />;
+        return <VocationalEquipmentGridLayout model={enrichedModel as unknown as TitleBulletsModel} theme={theme} />;
       case 'vocational_fault_diagnostic':
-        return <VocationalFaultDiagnosticLayout model={{ ...(model as TitleContentModel), layoutId: layout_id } as TitleContentModel} theme={theme} />;
+        return <VocationalFaultDiagnosticLayout model={enrichedModel as unknown as TitleContentModel} theme={theme} />;
       case 'vocational_practice_sandbox':
-        return <VocationalPracticeSandboxLayout model={model} theme={theme} />;
+        return <VocationalPracticeSandboxLayout model={model as any} theme={theme} />;
       case 'vocational_mission_complete':
         return <VocationalMissionCompleteLayout model={model as EndingModel} theme={theme} />;
 
@@ -474,7 +554,15 @@ export const SlideRenderer: React.FC<SlideRendererProps> = ({
       case 'blueprint_quote':
         return <BlueprintQuoteLayout model={model as QuoteModel} theme={theme} />;
       case 'blueprint_annotation':
-        return <BlueprintAnnotationLayout model={model} theme={theme} />;
+        return (
+          <BlueprintAnnotationLayout
+            model={enrichedModel}
+            theme={theme}
+            onImageUpload={onImageUpload
+              ? () => onImageUpload(normalizeLayoutId(layout_id as LayoutId) === 'detail_zoom' ? 'image_src' : 'image.src')
+              : undefined}
+          />
+        );
       case 'blueprint_section_title':
         return <BlueprintSectionTitleLayout model={model as SectionTitleModel} theme={theme} />;
       case 'blueprint_dual_panel':
@@ -486,7 +574,7 @@ export const SlideRenderer: React.FC<SlideRendererProps> = ({
       case 'blueprint_tri_compare':
         return <BlueprintTriCompareLayout model={model} theme={theme} />;
       case 'blueprint_gallery':
-        return <BlueprintGalleryLayout model={model} theme={theme} />;
+        return <BlueprintGalleryLayout model={model} theme={theme} onImageUpload={onImageUpload} />;
       case 'blueprint_big_reveal':
         return <BlueprintBigRevealLayout model={model} theme={theme} />;
       case 'blueprint_closing':
@@ -565,9 +653,42 @@ export const SlideRenderer: React.FC<SlideRendererProps> = ({
     }
   };
 
+  const renderLayoutError = (error: Error) => (
+    <div
+      style={{
+        width: theme.sizes.slideWidth,
+        height: theme.sizes.slideHeight,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#fee',
+        color: '#c00',
+        padding: '40px',
+        flexDirection: 'column',
+      }}
+    >
+      <div style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '20px' }}>
+        Render Error
+      </div>
+      <div style={{ fontSize: '16px' }}>
+        {getLayoutDisplayName(layout_id)} ({normalizedLayoutId})
+      </div>
+      <div style={{ fontSize: '14px', marginTop: '10px', color: '#666' }}>
+        {error.message}
+      </div>
+    </div>
+  );
+
   return (
     <div style={containerStyle} onClick={onClick}>
-      {renderLayout()}
+      <div ref={layoutHostRef} style={{ width: '100%', height: '100%' }}>
+        <LayoutErrorBoundary
+          resetKey={`${page.page_id}:${normalizedLayoutId}`}
+          fallback={renderLayoutError}
+        >
+          {renderLayout()}
+        </LayoutErrorBoundary>
+      </div>
     </div>
   );
 };

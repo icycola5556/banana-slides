@@ -27,6 +27,7 @@ from schemas.common import SuccessResponse
 from services.image_request_policy import get_shared_image_request_gate
 from services.runtime_state import load_runtime_config, runtime_context
 from services.file_service import FileService
+from utils.nested_paths import set_nested_path
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/projects", tags=["html-images"])
@@ -282,19 +283,7 @@ async def save_html_image(
             html_model = {}
         
         # 根据slot_path更新对应的字段
-        # slot_path格式如: "image.src", "left.image_src", "background_image" 等
-        def set_nested_path(obj: dict, path: str, value: str):
-            """递归设置嵌套路径的值"""
-            parts = path.split(".")
-            current = obj
-            for i, part in enumerate(parts[:-1]):
-                if part not in current:
-                    current[part] = {}
-                elif not isinstance(current[part], dict):
-                    current[part] = {}
-                current = current[part]
-            current[parts[-1]] = value
-        
+        # slot_path格式如: "image.src", "left.image_src", "items.0.image_src", "background_image" 等
         set_nested_path(html_model, body.slot_path, image_url)
         
         # 保存更新后的html_model

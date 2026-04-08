@@ -58,6 +58,21 @@ TEMPLATE_PROMPT_PROFILES: Dict[str, Dict[str, str]] = {
         "background_style": "深蓝渐层教学底图，边缘有弱光效，中心留白可读。",
         "background_texture": "边缘可有细线光带与轻网格，禁止中心强主体抢正文。",
     },
+    "minimal_clean": {
+        "content_style": "工业蓝图视觉，冷青与石墨灰，精密、克制、带 CAD 线框与工程标注氛围。",
+        "background_style": "蓝图式工程底图，冷青网格与微光边框，理性、精密、留白明确。",
+        "background_texture": "边缘允许细网格、角标、线框与轻微扫描纹理，中部保持干净。",
+    },
+    "warm_edu": {
+        "content_style": "高危实训视觉，深色底板、高对比警示色、结构化教学信息、SOP 气质明显。",
+        "background_style": "实训警戒底图，暗色工业环境配合警示色边框与微弱设备纹理。",
+        "background_texture": "边缘可有警戒线、检修标签、网格与弱发光，中间保持可读。",
+    },
+    "business_pro": {
+        "content_style": "重工终端视觉，深色数据终端风、工业精密质感、HUD/监控面板氛围、强调机械机理。",
+        "background_style": "终端监控底图，深蓝黑配合工业微光、屏显层次与设备背景虚化。",
+        "background_texture": "边缘允许终端线框、扫描纹理、弱 HUD 元素，中部避免无关强主体。",
+    },
 }
 
 LAYOUT_INTENT_MAP: Dict[str, str] = {
@@ -81,6 +96,9 @@ LAYOUT_COMPOSITION_MAP: Dict[str, str] = {
     "cover": "构图建议：主体靠边，中心和上方留白给标题区域。",
     "default": "构图建议：主体明确，2-4个强相关元素，避免大面积空白。",
 }
+
+LAYOUT_INTENT_MAP["detail_zoom"] = "细节标注图，主图必须能一一对应页面中的标注目标与工程机理关系。"
+LAYOUT_COMPOSITION_MAP["detail_zoom"] = "构图建议：主体贴近镜头并占据主要画面，关键部件分区清晰，避免大面积无关留白。"
 
 INDUSTRY_HINTS: Dict[str, Dict[str, Any]] = {
     "education": {
@@ -133,10 +151,12 @@ BACKGROUND_VARIANTS: List[str] = [
 ]
 
 NEGATIVE_CONSTRAINT_CONTENT = (
-    "禁止：文字、数字、Logo、水印、纯抽象渐变、纯装饰边框、无意义背景纹理。"
+    "严禁：图片中出现任何文字、数字、字母、Logo、水印、标签、标注、测量刻度、指示箭头带文字。"
+    "图片必须是纯视觉内容，所有文字说明应在PPT页面上叠加，而非在图片中。"
 )
 NEGATIVE_CONSTRAINT_BACKGROUND = (
-    "禁止：文字、数字、Logo、水印、人物特写、居中强主体、杂乱高频纹理、强眩光。"
+    "严禁：图片中出现任何文字、数字、字母、Logo、水印、标签、标注、测量刻度。"
+    "禁止人物特写、居中强主体、杂乱高频纹理、强眩光。"
 )
 
 TOKEN_SPLIT_RE = re.compile(r"[，。；、,.!?:：/\\\s\-\(\)\[\]{}]+")
@@ -215,6 +235,7 @@ def _normalize_slot_context(slot: Dict[str, Any], project: Any) -> Dict[str, Any
     if isinstance(page_facts, list):
         facts = [_clean_text(x) for x in page_facts if _clean_text(x)]
     facts = _uniq_keep_order(facts)[:8]
+    annotation_targets = _normalize_annotation_targets(raw_context.get("annotation_targets"))
 
     page_title = _clean_text(raw_context.get("page_title", ""))
     project_topic = _clean_text(
@@ -258,10 +279,28 @@ def _normalize_slot_context(slot: Dict[str, Any], project: Any) -> Dict[str, Any
         "extra_requirements": extra_requirements,
         "template_style": template_style,
         "visual_goal": visual_goal,
+        "annotation_targets": annotation_targets,
         "industry": industry,
         "audience": audience,
         "slot_path": slot_path,
     }
+
+
+def _normalize_annotation_targets(value: Any) -> List[Dict[str, str]]:
+    if not isinstance(value, list):
+        return []
+
+    normalized: List[Dict[str, str]] = []
+    for item in value[:4]:
+        if isinstance(item, dict):
+            label = _clean_text(item.get("label"))
+            description = _clean_text(item.get("description"))
+        else:
+            label = _clean_text(item)
+            description = ""
+        if label or description:
+            normalized.append({"label": label, "description": description})
+    return normalized
 
 
 def _build_rule_prompt(raw_prompt: str, context: Dict[str, Any], slot_key: str) -> str:
@@ -282,6 +321,15 @@ def _build_content_rule_prompt(raw_prompt: str, context: Dict[str, Any], slot_ke
     industry = context.get("industry", "")
     audience = context.get("audience", "")
     visual_goal = context.get("visual_goal", "")
+    annotation_targets = context.get("annotation_targets", [])
+    annotation_focus = "；".join(
+        "：".join(part for part in [target.get("label", ""), target.get("description", "")] if part)
+        for target in annotation_targets
+    )
+    is_mechanical_hydraulic_topic = any(
+        token in focus
+        for token in ["液压", "空蚀", "气穴", "汽蚀", "泵", "阀", "活塞", "流道", "叶轮", "金属", "蒸汽压", "疲劳", "剥落", "元件", "机械", "工程"]
+    )
 
     if layout_id == "two_column":
         if slot_role == "left":
@@ -303,6 +351,8 @@ def _build_content_rule_prompt(raw_prompt: str, context: Dict[str, Any], slot_ke
         f"讲解重点：{focus}。",
     ]
 
+    if annotation_focus:
+        lines.append(f"标注目标：{annotation_focus}。")
     if visual_goal:
         lines.append(f"页面意图：{visual_goal}")
     lines.extend(
@@ -323,6 +373,28 @@ def _build_content_rule_prompt(raw_prompt: str, context: Dict[str, Any], slot_ke
         lines.append(f"风格补充：{context['template_style']}")
     if context.get("extra_requirements"):
         lines.append(f"额外约束：{context['extra_requirements']}")
+
+    if is_mechanical_hydraulic_topic:
+        lines.append("行业边界：这是工业/液压/机械机理页面，不允许出现人体、医疗设备、超声探头、手术场景、生物组织、医学影像屏幕。")
+
+    if layout_id == "detail_zoom":
+        lines.extend(
+            [
+                "细节图约束：图中每个标注目标都必须对应到清晰、独立、可辨识的真实结构或物理区域，不能只给泛化场景。",
+                "教学友好约束：优先选择剖面、透明示意、部件特写、工程机制讲解图，让观众一眼看出关键部件关系。",
+                "排除项：避免大面积无关白墙、空白背景、无关库存照片、无法支撑后续标注点落位的模糊主体。",
+            ]
+        )
+        if industry == "tech" or any(token in focus for token in ["液压", "活塞", "泵", "阀", "机械", "力"]):
+            lines.append("工程主题优先：生成液压/机械机构的教学化近景或剖视视角，突出输入端、输出端和关键传动部件。")
+    elif layout_id == "image_full" and is_mechanical_hydraulic_topic:
+        lines.extend(
+            [
+                "机制图约束：主体必须是液压元件、泵阀流道、叶轮、金属表面或剖视结构本体，不要用抽象泡泡隐喻替代真实机构。",
+                "故障机理约束：如果涉及气穴、空蚀、汽蚀，应表现局部低压、气泡形成与溃灭、以及金属表面点蚀/疲劳剥落的工程链路。",
+                "场景排除：避免医学诊断设备感、超声探头、人体组织、实验室生物样本、消费电子产品特写。",
+            ]
+        )
 
     # Preserve previous baseline prompt as soft hint (shortened), improving compatibility.
     baseline = _clean_text(raw_prompt)
@@ -430,6 +502,7 @@ def _to_rewriter_payload(item: Dict[str, Any]) -> Dict[str, Any]:
         "slot_role": context.get("slot_role"),
         "page_title": context.get("page_title"),
         "facts": context.get("facts", []),
+        "annotation_targets": context.get("annotation_targets", []),
         "scheme_id": context.get("scheme_id"),
         "industry": context.get("industry"),
         "audience": context.get("audience"),
@@ -496,6 +569,28 @@ def _quality_gate_prompt(prompt: str, fallback: str, context: Dict[str, Any]) ->
         if "留白" not in candidate:
             candidate = f"{candidate} 中心区域保持留白，保证正文可读。"
 
+    if context.get("layout_id") == "detail_zoom":
+        annotation_targets = context.get("annotation_targets", [])
+        target_keywords = _extract_keywords(
+            " ".join(
+                part
+                for target in annotation_targets
+                for part in [target.get("label", ""), target.get("description", "")]
+                if part
+            ).split(" ")
+        )
+        if target_keywords:
+            coverage = sum(1 for kw in target_keywords[:6] if kw and kw in candidate)
+            if coverage == 0:
+                return fallback
+        if not any(token in candidate for token in ["剖面", "透明", "特写", "机械", "液压", "结构"]):
+            candidate = f"{candidate} 优先采用剖面、透明示意或部件特写视角，突出机械结构关系。"
+
+    mechanical_focus = " ".join(context.get("facts", []) or [context.get("page_title", ""), context.get("project_topic", "")])
+    if any(token in mechanical_focus for token in ["液压", "空蚀", "气穴", "汽蚀", "泵", "阀", "活塞", "流道", "金属", "机械", "工程"]):
+        if any(token in candidate for token in ["医疗", "超声", "探头", "人体", "手术", "生物组织", "医学影像"]):
+            return fallback
+
     # Safety/quality constraints should always exist.
     if "禁止" not in candidate and "避免" not in candidate:
         negative = NEGATIVE_CONSTRAINT_BACKGROUND if asset_type == "background" else NEGATIVE_CONSTRAINT_CONTENT
@@ -530,7 +625,7 @@ def _normalize_layout_id(layout_id: str) -> str:
     if not layout_id:
         return "title_content"
     lid = layout_id.strip().lower()
-    if lid in {"title_content", "title_bullets", "two_column", "process_steps", "image_full", "cover"}:
+    if lid in {"title_content", "title_bullets", "two_column", "process_steps", "image_full", "detail_zoom", "cover"}:
         return lid
     if lid.startswith("cover_"):
         return "cover"
@@ -538,6 +633,8 @@ def _normalize_layout_id(layout_id: str) -> str:
         return "title_bullets"
     if "step" in lid or "process" in lid:
         return "process_steps"
+    if "detail" in lid or "zoom" in lid or "annotation" in lid or "specimen" in lid:
+        return "detail_zoom"
     if "column" in lid or "split" in lid or "before_after" in lid:
         return "two_column"
     if "image" in lid or "gallery" in lid or "hero" in lid or "portfolio" in lid:

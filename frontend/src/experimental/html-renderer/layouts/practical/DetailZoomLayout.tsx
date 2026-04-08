@@ -16,12 +16,13 @@ import {
 interface DetailZoomLayoutProps {
   model: DetailZoomModel;
   theme: ThemeConfig;
+  onImageUpload?: () => void;
 }
 
 const asStyle = (styles: Record<string, string | number | undefined>): React.CSSProperties =>
   styles as React.CSSProperties;
 
-export const DetailZoomLayout: React.FC<DetailZoomLayoutProps> = ({ model, theme }) => {
+export const DetailZoomLayout: React.FC<DetailZoomLayoutProps> = ({ model, theme, onImageUpload }) => {
   const { title, image_src, annotations, background_image } = model;
 
   const slideStyle: React.CSSProperties = {
@@ -79,6 +80,7 @@ export const DetailZoomLayout: React.FC<DetailZoomLayoutProps> = ({ model, theme
             theme={theme}
             slotLabel="主图标注插槽"
             slotHint="建议使用可放大细节的主体图，标注点会叠加在这张图上。"
+            onClick={onImageUpload}
             frameStyle={{ width: '100%', height: '100%' }}
             imageStyle={imageStyle}
           />

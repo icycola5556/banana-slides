@@ -126,9 +126,52 @@ export const createCoreSlice: StateCreator<ProjectStore, [], [], ProjectCoreSlic
     try {
       const response = await api.getProject(targetProjectId);
       if (response.data) {
-        const project = normalizeProject(response.data);
+        let project = normalizeProject(response.data);
+        const prevProject = get().currentProject;
+        
+        // 保留本地 html_model 中的变体信息（避免服务器数据覆盖本地变体更改）
+        if (prevProject?.id === project.id && prevProject?.pages && project.pages) {
+          const localVariantMap = new Map<string, { variant?: string; layout_variant?: string }>();
+          prevProject.pages.forEach((p) => {
+            const model = p.html_model as Record<string, unknown> | undefined;
+            if (model?.variant || model?.layout_variant) {
+              localVariantMap.set(p.id || p.page_id || '', {
+                variant: model.variant as string | undefined,
+                layout_variant: model.layout_variant as string | undefined,
+              });
+            }
+          });
+          
+          if (localVariantMap.size > 0) {
+            project = {
+              ...project,
+              pages: project.pages.map((p) => {
+                const localVariant = localVariantMap.get(p.id || p.page_id || '');
+                if (localVariant) {
+                  const model = p.html_model as Record<string, unknown> | undefined;
+                  // 如果本地有变体信息但服务器数据中没有，或者本地变体与服务器不同，保留本地变体
+                  const serverVariant = model?.variant || model?.layout_variant;
+                  const localVariantValue = localVariant.variant || localVariant.layout_variant;
+                  if (localVariantValue && serverVariant !== localVariantValue) {
+                    console.log(`[syncProject] Preserving local variant for page ${p.id}: local=${localVariantValue}, server=${serverVariant}`);
+                    return {
+                      ...p,
+                      html_model: {
+                        ...model,
+                        variant: localVariant.variant,
+                        layout_variant: localVariant.layout_variant,
+                      } as any,
+                    };
+                  }
+                }
+                return p;
+              }),
+            };
+          }
+        }
+        
         // Only clear aiRefineHistory when project actually changes
-        const prevId = get().currentProject?.id;
+        const prevId = prevProject?.id;
         const updates: any = { currentProject: project };
         if (prevId !== project.id) {
           updates.aiRefineHistory = {};

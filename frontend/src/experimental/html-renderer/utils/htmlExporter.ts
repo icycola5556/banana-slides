@@ -5,6 +5,24 @@
 
 import { PPTDocument, ThemeConfig } from '../types/schema';
 
+type ImageSourceResolver = (url: string) => Promise<string>;
+
+const INLINEABLE_IMAGE_FIELDS = new Set([
+  'background_image',
+  'diagram_url',
+  'hero_image',
+  'image',
+  'image_src',
+]);
+
+const shouldInlineImageSource = (key?: string, parentKey?: string): boolean => {
+  if (!key) {
+    return false;
+  }
+
+  return INLINEABLE_IMAGE_FIELDS.has(key) || (key === 'src' && parentKey === 'image');
+};
+
 /**
  * 生成完整的HTML文档
  * 符合HTML转PPT的结构要求
@@ -118,4 +136,76 @@ export function fileToBase64(file: File): Promise<string> {
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
+}
+
+/**
+ * Convert image-like fields inside a layout model to self-contained data URLs.
+ */
+export async function inlineModelImageSources<T>(
+  model: T,
+  resolveImageSource: ImageSourceResolver = imageUrlToBase64
+): Promise<T> {
+  const cache = new Map<string, Promise<string>>();
+
+  const inlineSource = (value: string): Promise<string> => {
+    const normalized = value.trim();
+    if (!normalized || normalized.startsWith('data:image/')) {
+      return Promise.resolve(normalized);
+    }
+
+    if (!cache.has(normalized)) {
+      cache.set(
+        normalized,
+        resolveImageSource(normalized).catch(() => normalized)
+      );
+    }
+
+    return cache.get(normalized)!;
+  };
+
+  const visit = async (value: unknown, key?: string, parentKey?: string): Promise<unknown> => {
+    if (Array.isArray(value)) {
+      return Promise.all(value.map((item) => visit(item)));
+    }
+
+    if (value && typeof value === 'object') {
+      const entries = await Promise.all(
+        Object.entries(value as Record<string, unknown>).map(async ([childKey, childValue]) => (
+          [childKey, await visit(childValue, childKey, key)] as const
+        ))
+      );
+      return Object.fromEntries(entries);
+    }
+
+    if (typeof value === 'string' && shouldInlineImageSource(key, parentKey)) {
+      return inlineSource(value);
+    }
+
+    return value;
+  };
+
+  return visit(model) as Promise<T>;
+}
+
+/**
+ * Inline image sources for every page payload before exporting standalone HTML.
+ */
+export async function inlinePagePayloadModels<T extends { model: unknown }>(
+  pages: T[],
+  resolveImageSource: ImageSourceResolver = imageUrlToBase64
+): Promise<T[]> {
+  const cache = new Map<string, Promise<string>>();
+  const cachedResolver: ImageSourceResolver = async (url: string) => {
+    if (!cache.has(url)) {
+      cache.set(url, resolveImageSource(url).catch(() => url));
+    }
+    return cache.get(url)!;
+  };
+
+  return Promise.all(
+    pages.map(async (page) => ({
+      ...page,
+      model: await inlineModelImageSources(page.model, cachedResolver),
+    }))
+  );
 }

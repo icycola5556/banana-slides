@@ -76,7 +76,16 @@ export const ImageSlotFrame: React.FC<ImageSlotFrameProps> = ({
 
   if (!showPlaceholder) {
     return (
-      <div ref={frameRef} style={mergedFrameStyle}>
+      <div
+        ref={frameRef}
+        style={{
+          ...mergedFrameStyle,
+          cursor: onClick ? 'pointer' : 'default',
+        }}
+        onClick={onClick}
+        title={onClick ? '点击替换图片' : slotHint}
+        data-testid="image-slot-frame"
+      >
         <img
           src={src || ''}
           alt={alt || ''}
@@ -89,6 +98,77 @@ export const ImageSlotFrame: React.FC<ImageSlotFrameProps> = ({
           }}
           onError={() => setLoadFailed(true)}
         />
+
+        <div
+          style={{
+            position: 'absolute',
+            top: 12,
+            left: 12,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '6px 10px',
+            borderRadius: 999,
+            background: 'rgba(15, 23, 42, 0.72)',
+            color: '#ffffff',
+            fontSize: 12,
+            fontWeight: 700,
+            boxShadow: '0 6px 16px rgba(15, 23, 42, 0.16)',
+          }}
+        >
+          <ImageIcon size={14} />
+          <span>{slotLabel}</span>
+        </div>
+
+        <div
+          style={{
+            position: 'absolute',
+            top: 12,
+            right: 12,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '6px 10px',
+            borderRadius: 999,
+            background: 'rgba(15, 23, 42, 0.72)',
+            color: '#E2E8F0',
+            fontSize: 11,
+            fontWeight: 600,
+            boxShadow: '0 6px 16px rgba(15, 23, 42, 0.16)',
+          }}
+        >
+          <Ruler size={12} />
+          <span>{sizeText}</span>
+        </div>
+
+        {onClick ? (
+          <div
+            style={{
+              position: 'absolute',
+              insetInline: 0,
+              bottom: 0,
+              padding: '18px 16px 14px',
+              background: 'linear-gradient(180deg, rgba(15,23,42,0) 0%, rgba(15,23,42,0.78) 100%)',
+              display: 'flex',
+              justifyContent: 'center',
+              pointerEvents: 'none',
+            }}
+          >
+            <span
+              style={{
+                padding: '8px 14px',
+                borderRadius: 999,
+                background: `${theme.colors.accent}22`,
+                color: '#ffffff',
+                fontSize: 12,
+                fontWeight: 700,
+                border: `1px solid ${theme.colors.accent}55`,
+              }}
+            >
+              点击替换图片
+            </span>
+          </div>
+        ) : null}
       </div>
     );
   }

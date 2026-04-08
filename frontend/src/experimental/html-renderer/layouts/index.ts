@@ -6,6 +6,6 @@ export * from './practical';
 export * from './modern';
 export * from './edu-dark';
 export * from './vocational';
-export { LAYOUT_ID_ALIASES, normalizeLayoutId } from './aliases';
+export { LAYOUT_ID_ALIASES, normalizeLayoutId, resolveThemeLayout } from './aliases';
 export { layoutNames, getLayoutDisplayName } from './names';
 export { renderLayoutHTML } from './registry';
