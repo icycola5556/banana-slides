@@ -245,7 +245,7 @@ export const layoutSchemePreviews: Record<string, LayoutSchemePreview> = {
       {
         label: '技术封面',
         summary: '用蓝图式封面把发布主题和系统气质先建立起来。',
-        layoutId: 'cover',
+        layoutId: 'cover_tech',
         model: {
           title: 'AI Agent 发布方案',
           subtitle: '从原型验证到生产环境交付',
@@ -258,7 +258,7 @@ export const layoutSchemePreviews: Record<string, LayoutSchemePreview> = {
       {
         label: '技术大纲',
         summary: '目录页交代技术汇报的阅读顺序和判断标准。',
-        layoutId: 'toc',
+        layoutId: 'toc_tech',
         model: {
           title: '本次发布包含什么',
           items: [
@@ -272,7 +272,7 @@ export const layoutSchemePreviews: Record<string, LayoutSchemePreview> = {
       {
         label: '技术架构',
         summary: '先讲架构，再讲细节，帮助用户快速抓住系统边界。',
-        layoutId: 'title_content',
+        layoutId: 'arch_blocks',
         model: {
           title: '系统如何分层协作',
           content: [
@@ -286,7 +286,7 @@ export const layoutSchemePreviews: Record<string, LayoutSchemePreview> = {
       {
         label: '逻辑时序',
         summary: '时序页适合把一次请求的完整流转讲透。',
-        layoutId: 'process_steps',
+        layoutId: 'flow_logic_sequence',
         model: {
           title: '一次生成请求如何被处理',
           subtitle: 'Request -> Orchestration -> Delivery',
@@ -301,7 +301,7 @@ export const layoutSchemePreviews: Record<string, LayoutSchemePreview> = {
       {
         label: '性能看板',
         summary: '指标卡页帮助用户理解系统已经稳定到什么程度。',
-        layoutId: 'edu_data_board',
+        layoutId: 'param_dashboard',
         model: {
           title: '运行指标总览',
           subtitle: '最近 14 天线上样本',
@@ -325,7 +325,7 @@ export const layoutSchemePreviews: Record<string, LayoutSchemePreview> = {
       {
         label: '协议拆解',
         summary: '协议/字段类页面适合用高密度要点布局承接深度信息。',
-        layoutId: 'title_bullets',
+        layoutId: 'protocol_analysis',
         model: {
           title: 'SSE 事件字段约定',
           subtitle: '让前后端对同一状态机说同一种语言',
@@ -349,7 +349,7 @@ export const layoutSchemePreviews: Record<string, LayoutSchemePreview> = {
       {
         label: '需求规格',
         summary: '规格页强调上线前必须满足的可验证条件。',
-        layoutId: 'title_bullets',
+        layoutId: 'requirement_specs',
         model: {
           title: '本次上线的硬性要求',
           bullets: [
@@ -372,7 +372,7 @@ export const layoutSchemePreviews: Record<string, LayoutSchemePreview> = {
       {
         label: '选型对比',
         summary: '对比页适合解释为什么当前方案最平衡。',
-        layoutId: 'two_column',
+        layoutId: 'system_comparison',
         model: {
           title: '为什么选择 HTML 渲染链路',
           left: {
@@ -398,7 +398,7 @@ export const layoutSchemePreviews: Record<string, LayoutSchemePreview> = {
       {
         label: '技术原理',
         summary: '原理页用于承接核心设计思想，而不是只讲执行结果。',
-        layoutId: 'title_content',
+        layoutId: 'tech_principle',
         model: {
           title: '状态驱动的前端展示原则',
           content: [
@@ -411,7 +411,7 @@ export const layoutSchemePreviews: Record<string, LayoutSchemePreview> = {
       {
         label: '技术演进',
         summary: '最后用收束页把当前版本和下一阶段路线放到一起。',
-        layoutId: 'ending',
+        layoutId: 'ending_tech',
         model: {
           title: '下一阶段迭代方向',
           subtitle: '把稳定性和模板体验继续往前推',
@@ -622,7 +622,7 @@ export const layoutSchemePreviews: Record<string, LayoutSchemePreview> = {
       {
         label: '导入封面',
         summary: '用轻快封面把课堂氛围先调动起来。',
-        layoutId: 'cover',
+        layoutId: 'cover_interactive',
         model: {
           title: 'AI PPT 共创工作坊',
           subtitle: '让学生边做边理解结构表达',
@@ -635,7 +635,7 @@ export const layoutSchemePreviews: Record<string, LayoutSchemePreview> = {
       {
         label: '学程地图',
         summary: '地图页先告诉学生今天会经历哪些互动节点。',
-        layoutId: 'toc',
+        layoutId: 'agenda_path',
         model: {
           title: '今天的互动路线',
           items: [
@@ -649,7 +649,7 @@ export const layoutSchemePreviews: Record<string, LayoutSchemePreview> = {
       {
         label: '课前探究',
         summary: '热身问题页适合把学生迅速拉进思考状态。',
-        layoutId: 'warmup_question',
+        layoutId: 'warmup_inquiry',
         model: {
           question: '如果一套 PPT 只有漂亮页面但没有叙事结构，它还能真正说服人吗？',
           thinkTime: 30,
@@ -659,7 +659,7 @@ export const layoutSchemePreviews: Record<string, LayoutSchemePreview> = {
       {
         label: '即时投票',
         summary: '投票页让课堂瞬间变成参与式场域。',
-        layoutId: 'poll_interactive',
+        layoutId: 'feedback_poll',
         model: {
           question: '你觉得最需要优先优化的是哪一项？',
           instruction: '30 秒内完成投票，随后公布结果。',
@@ -673,7 +673,7 @@ export const layoutSchemePreviews: Record<string, LayoutSchemePreview> = {
       {
         label: '案例研讨',
         summary: '用案例页抛出真实问题，方便进入讨论。',
-        layoutId: 'title_content',
+        layoutId: 'case_discussion',
         model: {
           title: '案例：为什么这个课堂项目没人愿意继续看？',
           content: [
@@ -686,7 +686,7 @@ export const layoutSchemePreviews: Record<string, LayoutSchemePreview> = {
       {
         label: '协作任务',
         summary: '协作页适合明确角色、产出和时间限制。',
-        layoutId: 'title_bullets',
+        layoutId: 'group_collab',
         model: {
           title: '分组协作任务',
           bullets: [
@@ -700,7 +700,7 @@ export const layoutSchemePreviews: Record<string, LayoutSchemePreview> = {
       {
         label: '知识脑图',
         summary: '脑图页帮助把讨论结果重新归纳成结构。',
-        layoutId: 'image_full',
+        layoutId: 'mind_map_structure',
         model: {
           title: '共创后的知识脑图',
           image_src: artwork.interactiveClass,
@@ -711,7 +711,7 @@ export const layoutSchemePreviews: Record<string, LayoutSchemePreview> = {
       {
         label: '交互测验',
         summary: '测验页适合在中后段快速检查理解程度。',
-        layoutId: 'title_bullets',
+        layoutId: 'quiz_interaction',
         model: {
           title: '快速检查',
           subtitle: '下面哪一项最能提升课堂说服力？',
@@ -726,7 +726,7 @@ export const layoutSchemePreviews: Record<string, LayoutSchemePreview> = {
       {
         label: '情境模拟',
         summary: '情境页用角色和约束把练习拉近真实现场。',
-        layoutId: 'title_content',
+        layoutId: 'role_play_scenario',
         model: {
           title: '模拟任务',
           content: [
@@ -739,7 +739,7 @@ export const layoutSchemePreviews: Record<string, LayoutSchemePreview> = {
       {
         label: '评价结语',
         summary: '最后收束课堂产出、评价标准与下一步行动。',
-        layoutId: 'ending',
+        layoutId: 'ending_interactive',
         model: {
           title: '本次工作坊收束',
           subtitle: '带走一套可复用的课堂组织方式',
@@ -759,7 +759,7 @@ export const layoutSchemePreviews: Record<string, LayoutSchemePreview> = {
       {
         label: '现场封面',
         summary: '先用强画面封面把故事氛围拉满。',
-        layoutId: 'cover',
+        layoutId: 'cover_field',
         model: {
           title: '城市更新观察档案',
           subtitle: '从现场勘察到设计表达',
@@ -772,7 +772,7 @@ export const layoutSchemePreviews: Record<string, LayoutSchemePreview> = {
       {
         label: '演进轴线',
         summary: '时间线先交代背景变化和故事骨架。',
-        layoutId: 'timeline',
+        layoutId: 'timeline_evolution',
         model: {
           title: '项目演进轴线',
           orientation: 'vertical',
@@ -786,7 +786,7 @@ export const layoutSchemePreviews: Record<string, LayoutSchemePreview> = {
       {
         label: '现场观测',
         summary: '大图页适合放全景图或关键现场记录。',
-        layoutId: 'image_full',
+        layoutId: 'field_observation',
         model: {
           title: '勘察现场总览',
           image_src: artwork.visualArchive,
@@ -797,7 +797,7 @@ export const layoutSchemePreviews: Record<string, LayoutSchemePreview> = {
       {
         label: '专业图库',
         summary: '图库页适合陈列一组风格统一的图像样本。',
-        layoutId: 'portfolio',
+        layoutId: 'gallery_professional',
         model: {
           title: '关键画面样本',
           subtitle: '统一色调与镜头语言',
@@ -812,7 +812,7 @@ export const layoutSchemePreviews: Record<string, LayoutSchemePreview> = {
       {
         label: '修缮对比',
         summary: '对比页适合用左右结构直观说明变化。',
-        layoutId: 'two_column',
+        layoutId: 'case_before_after',
         model: {
           title: '改造前后对比',
           left: {
@@ -838,7 +838,7 @@ export const layoutSchemePreviews: Record<string, LayoutSchemePreview> = {
       {
         label: '图文信息流',
         summary: '信息流页适合在大图叙事中补充少量关键解释。',
-        layoutId: 'title_bullets',
+        layoutId: 'infographic_flow',
         model: {
           title: '画面之外，文字该承担什么',
           bullets: [
@@ -852,7 +852,7 @@ export const layoutSchemePreviews: Record<string, LayoutSchemePreview> = {
       {
         label: '踏勘报告',
         summary: '第二张大图页用于展示更具体的现场证据。',
-        layoutId: 'image_full',
+        layoutId: 'site_survey',
         model: {
           title: '多点位踏勘记录',
           image_src: artwork.techGrid,
@@ -863,7 +863,7 @@ export const layoutSchemePreviews: Record<string, LayoutSchemePreview> = {
       {
         label: '标本特写',
         summary: '细节放大页适合强调工艺、材质或关键证据。',
-        layoutId: 'detail_zoom',
+        layoutId: 'specimen_detail',
         model: {
           title: '材料细节标注',
           image_src: artwork.visualArchive,
@@ -877,7 +877,7 @@ export const layoutSchemePreviews: Record<string, LayoutSchemePreview> = {
       {
         label: '成果品鉴',
         summary: '结尾前再用一次画廊陈列展示最终成果集合。',
-        layoutId: 'portfolio',
+        layoutId: 'portfolio_industry',
         model: {
           title: '成果陈列',
           subtitle: '从观察走向作品表达',
@@ -892,7 +892,7 @@ export const layoutSchemePreviews: Record<string, LayoutSchemePreview> = {
       {
         label: '现场收束',
         summary: '最后一页回到愿景和核心印象。',
-        layoutId: 'ending',
+        layoutId: 'ending_field',
         model: {
           title: '让视觉成为讲述方式',
           subtitle: '不是每页都塞信息，而是让每页都留下画面记忆',
@@ -912,7 +912,7 @@ export const layoutSchemePreviews: Record<string, LayoutSchemePreview> = {
       {
         label: '实训封面',
         summary: '用明确的课题名和现场气质开启操作型内容。',
-        layoutId: 'cover',
+        layoutId: 'cover_practical',
         model: {
           title: '设备上机实训',
           subtitle: '从准备点检到成果交付',
@@ -925,7 +925,7 @@ export const layoutSchemePreviews: Record<string, LayoutSchemePreview> = {
       {
         label: '核查清单',
         summary: '点检页必须放在最前面，避免后面返工。',
-        layoutId: 'title_bullets',
+        layoutId: 'checklist_verification',
         model: {
           title: '上机前核查清单',
           bullets: [
@@ -939,7 +939,7 @@ export const layoutSchemePreviews: Record<string, LayoutSchemePreview> = {
       {
         label: '安全禁令',
         summary: '安全页需要在任何操作示范前强插进去。',
-        layoutId: 'safety_notice',
+        layoutId: 'safety_protocol',
         model: {
           title: '操作前必须牢记',
           warnings: [
@@ -953,7 +953,7 @@ export const layoutSchemePreviews: Record<string, LayoutSchemePreview> = {
       {
         label: '设备认知',
         summary: '先认设备和部件，再讲步骤，用户不会发懵。',
-        layoutId: 'two_column',
+        layoutId: 'equipment_orientation',
         model: {
           title: '工作台组件认知',
           left: {
@@ -976,7 +976,7 @@ export const layoutSchemePreviews: Record<string, LayoutSchemePreview> = {
       {
         label: 'SOP 手册',
         summary: '垂直流程页非常适合实操教学。',
-        layoutId: 'vertical_timeline',
+        layoutId: 'sop_vertical_steps',
         model: {
           title: '标准操作流程',
           accent_color: '#14b8a6',
@@ -991,7 +991,7 @@ export const layoutSchemePreviews: Record<string, LayoutSchemePreview> = {
       {
         label: '工单指令',
         summary: '操作页要把具体动作说明到能直接照着做。',
-        layoutId: 'title_content',
+        layoutId: 'task_instruction',
         model: {
           title: '本次任务要求',
           content: [
@@ -1004,7 +1004,7 @@ export const layoutSchemePreviews: Record<string, LayoutSchemePreview> = {
       {
         label: '故障排除',
         summary: '对照页适合讲最常见的错误和修复动作。',
-        layoutId: 'two_column',
+        layoutId: 'common_faults',
         model: {
           title: '常见错漏与修复',
           left: {
@@ -1030,7 +1030,7 @@ export const layoutSchemePreviews: Record<string, LayoutSchemePreview> = {
       {
         label: '老师小结',
         summary: '引用页适合放经验口诀和避坑提醒。',
-        layoutId: 'quote',
+        layoutId: 'technical_tip',
         model: {
           quote: '先把流程跑顺，再去追求每一页都漂亮。稳定的操作链路本身就是用户体验。',
           author: '实训讲师',
@@ -1040,7 +1040,7 @@ export const layoutSchemePreviews: Record<string, LayoutSchemePreview> = {
       {
         label: '零件精度',
         summary: '高密度参数说明页适合补充规范与验收标准。',
-        layoutId: 'title_content',
+        layoutId: 'detail_specs',
         model: {
           title: '交付验收标准',
           content: [
@@ -1053,7 +1053,7 @@ export const layoutSchemePreviews: Record<string, LayoutSchemePreview> = {
       {
         label: '实训总结',
         summary: '最后把成果交付和后续练习要求说清楚。',
-        layoutId: 'ending',
+        layoutId: 'ending_practical',
         model: {
           title: '本次实训交付',
           subtitle: '把流程跑通，才能把模板真正用起来',

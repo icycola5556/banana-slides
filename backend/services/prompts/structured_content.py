@@ -162,7 +162,7 @@ def get_structured_page_content_prompt(page_outline: dict,
     Returns:
         格式化后的 prompt 字符串
     """
-    layout_id = page_outline.get('layout_id', 'title_content')
+    layout_id = str(page_outline.get('layout_id', 'title_content') or 'title_content').lower()
     resolved_layout_id = resolve_layout_id(layout_id)
     schema_layout_id = layout_id if layout_id in LAYOUT_SCHEMAS else resolved_layout_id
     schema_template = LAYOUT_SCHEMAS.get(schema_layout_id, LAYOUT_SCHEMAS['title_content'])
@@ -204,7 +204,7 @@ def get_structured_page_content_prompt(page_outline: dict,
 """
 
     # TOC 布局特殊指令：必须列出所有章节（section_title）
-    if resolved_layout_id == 'toc':
+    if layout_id == toc_id or resolved_layout_id == 'toc':
         toc_instruction = """
 
 **目录页特殊要求**：
@@ -225,7 +225,7 @@ def get_structured_page_content_prompt(page_outline: dict,
     else:
         section_instruction = ""
 
-    if schema_layout_id == 'ending' and layout_variant == 'b':
+    if schema_layout_id in {'ending', 'ending_tech', 'ending_interactive', 'ending_field', 'ending_practical'} and layout_variant == 'b':
         variant_instruction = """
 **变体约束（ending, variant=b）**：
 - 必须输出 reflection_blocks，且至少 3 个 block

@@ -4,6 +4,13 @@ from typing import List, Dict, Any
 
 logger = logging.getLogger(__name__)
 
+DIRECT_TOC_LAYOUT_IDS = {'agenda_path', 'timeline_evolution', 'toc_tech'}
+
+
+def _is_toc_layout(layout_id: str) -> bool:
+    normalized = str(layout_id or '').lower()
+    return 'toc' in normalized or normalized in DIRECT_TOC_LAYOUT_IDS
+
 
 class OutlineMixin:
 
@@ -207,7 +214,7 @@ class OutlineMixin:
             if not isinstance(page, dict):
                 continue
             layout_id = page.get('layout_id', '').lower()
-            if 'toc' in layout_id:
+            if _is_toc_layout(layout_id):
                 toc_idx = i
                 break
 
@@ -259,7 +266,7 @@ class OutlineMixin:
             index = 1
             for page in pages_list:
                 layout_id = (page.get('layout_id', '') or '').lower()
-                if 'cover' in layout_id or 'toc' in layout_id or 'ending' in layout_id:
+                if 'cover' in layout_id or _is_toc_layout(layout_id) or 'ending' in layout_id:
                     continue
                 title = page.get('title', '')
                 if title:
@@ -293,7 +300,7 @@ class OutlineMixin:
             elif 'cover' in layout_id and cover_page is None:
                 cover_page = page
                 cover_idx = i
-            elif 'toc' in layout_id and toc_page is None:
+            elif _is_toc_layout(layout_id) and toc_page is None:
                 toc_page = page
                 toc_idx = i
 

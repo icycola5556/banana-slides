@@ -96,6 +96,7 @@ import {
   renderVaultCompareLayoutHTML,
   renderVaultDebriefLayoutHTML,
 } from './vault';
+import { renderPhaseOneWeakLayoutHTML } from './phaseOneWeakLayouts';
 import { normalizeLayoutId, resolveThemeLayout } from './aliases';
 import { getLayoutDisplayName } from './names';
 
@@ -199,6 +200,12 @@ export function renderLayoutHTML(
   let renderedHtml: string;
 
   try {
+    const directWeakHtml = renderPhaseOneWeakLayoutHTML(normalizedId, model as Record<string, unknown>, theme);
+    if (directWeakHtml) {
+      renderedHtml = directWeakHtml;
+      return injectThemeBackgroundIntoHtml(renderedHtml, normalizedId, model as Record<string, unknown>);
+    }
+
     renderedHtml = (() => {
       switch (normalizedId) {
     case 'cover':

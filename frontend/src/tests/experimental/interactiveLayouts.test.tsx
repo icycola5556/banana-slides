@@ -8,10 +8,10 @@ import { SlideRenderer } from '@/experimental/html-renderer/components/SlideRend
 describe('interactive scheme layout mapping', () => {
   const theme = getThemeByScheme('interactive');
 
-  it('normalizes interactive raw layout ids to vocational renderers', () => {
-    expect(normalizeLayoutId('group_collab' as any)).toBe('vocational_bullets');
-    expect(normalizeLayoutId('case_discussion' as any)).toBe('vocational_content');
-    expect(normalizeLayoutId('feedback_poll' as any)).toBe('vocational_content');
+  it('keeps phase-one interactive layout ids canonical', () => {
+    expect(normalizeLayoutId('group_collab' as any)).toBe('group_collab');
+    expect(normalizeLayoutId('case_discussion' as any)).toBe('case_discussion');
+    expect(normalizeLayoutId('feedback_poll' as any)).toBe('feedback_poll');
   });
 
   it('renders interactive content layouts in HTML export without unknown fallback', () => {
@@ -57,18 +57,18 @@ describe('interactive scheme layout mapping', () => {
     expect(queryByText(/未知布局类型/)).toBeNull();
   });
 
-  it('renders feedback_poll in SlideRenderer through vocational content mapping', () => {
+  it('renders feedback_poll in SlideRenderer through the direct phase-one renderer', () => {
     const page = {
       page_id: 'p-interactive-content',
       order_index: 2,
       layout_id: 'feedback_poll' as const,
       model: {
-        title: '即时反馈：学习痛点收集',
-        content: [
-          '请分享当前最难掌握的环节，以及你最希望获得的工具支持。',
-          '反馈将用于调整下一轮案例讲解与练习节奏。',
+        question: '即时反馈：学习痛点收集',
+        instruction: '30 秒内完成投票，然后进入案例讨论。',
+        options: [
+          { text: '结构设计', emoji: 'A' },
+          { text: '互动节奏', emoji: 'B' },
         ],
-        highlight: '识别痛点是优化工作流的第一步。',
       },
     };
 
@@ -77,7 +77,8 @@ describe('interactive scheme layout mapping', () => {
     );
 
     expect(getByText('即时反馈：学习痛点收集')).toBeTruthy();
-    expect(getByText(/识别痛点是优化工作流的第一步/)).toBeTruthy();
+    expect(getByText('结构设计')).toBeTruthy();
+    expect(getByText(/30 秒内完成投票/)).toBeTruthy();
     expect(queryByText(/未知布局类型/)).toBeNull();
   });
 });

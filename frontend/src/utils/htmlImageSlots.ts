@@ -214,6 +214,77 @@ export const collectHtmlImageSlotDescriptors = (
         push('hero_image', model?.hero_image, 'main');
       }
       break;
+    case 'arch_blocks':
+    case 'flow_logic_sequence':
+    case 'protocol_analysis':
+    case 'tech_principle':
+    case 'requirement_specs':
+    case 'quiz_interaction':
+    case 'role_play_scenario':
+    case 'task_instruction':
+    case 'detail_specs':
+    case 'infographic_flow':
+      if (options.optionalImageEnabled || hasExplicitImageField) {
+        push('image.src', model?.image?.src ?? model?.image_src, 'main');
+      }
+      break;
+    case 'mind_map_structure':
+      push('image_src', model?.image_src ?? model?.mind_map_image ?? model?.image?.src, 'main');
+      break;
+    case 'field_observation':
+    case 'specimen_detail':
+      push('image_src', model?.image_src, 'main');
+      break;
+    case 'system_comparison': {
+      const left = model?.left as Record<string, unknown> | undefined;
+      const right = model?.right as Record<string, unknown> | undefined;
+      if (left?.type === 'image' || options.inferTwoColumnPartType(left) === 'image') {
+        push('left.image_src', left?.image_src, 'left');
+      }
+      if (right?.type === 'image' || options.inferTwoColumnPartType(right) === 'image') {
+        push('right.image_src', right?.image_src, 'right');
+      }
+      break;
+    }
+    case 'case_discussion': {
+      const leftImagePath = model?.left?.image_src ? 'left.image_src' : 'case_image';
+      push(leftImagePath, model?.left?.image_src ?? model?.case_image, 'left');
+      if (model?.right?.image_src) {
+        push('right.image_src', model.right.image_src, 'right');
+      }
+      break;
+    }
+    case 'equipment_orientation': {
+      const leftImagePath = model?.left?.image_src ? 'left.image_src' : 'equipment_image';
+      push(leftImagePath, model?.left?.image_src ?? model?.equipment_image, 'left');
+      break;
+    }
+    case 'common_faults': {
+      const left = model?.left as Record<string, unknown> | undefined;
+      const right = model?.right as Record<string, unknown> | undefined;
+      if (left?.type === 'image' || options.inferTwoColumnPartType(left) === 'image') {
+        push('left.image_src', left?.image_src, 'left');
+      }
+      if (right?.type === 'image' || options.inferTwoColumnPartType(right) === 'image') {
+        push('right.image_src', right?.image_src, 'right');
+      }
+      break;
+    }
+    case 'case_before_after': {
+      const leftImagePath = model?.left?.image_src ? 'left.image_src' : 'before.image_src';
+      const rightImagePath = model?.right?.image_src ? 'right.image_src' : 'after.image_src';
+      push(leftImagePath, model?.left?.image_src ?? model?.before?.image_src, 'left');
+      push(rightImagePath, model?.right?.image_src ?? model?.after?.image_src, 'right');
+      break;
+    }
+    case 'site_survey': {
+      const leftImagePath = model?.left?.image_src ? 'left.image_src' : 'overview_image';
+      push(leftImagePath, model?.left?.image_src ?? model?.overview_image, 'left');
+      if (model?.right?.image_src) {
+        push('right.image_src', model.right.image_src, 'right');
+      }
+      break;
+    }
     case 'image_full':
     case 'detail_zoom':
     case 'vocational_blueprint_zoom':

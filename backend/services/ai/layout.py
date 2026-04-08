@@ -27,9 +27,51 @@ class LayoutMixin:
         toc_id = scheme_roles.get('toc', 'toc')
         ending_id = scheme_roles.get('ending', 'ending')
         is_tech_blue = (scheme_id or 'edu_dark') == 'tech_blue'
+        legacy_tech_blue_distribution = False
+        scheme_direct_base_candidates = {
+            'tech_blue': {
+                'title_content': ['arch_blocks', 'tech_principle'],
+                'title_bullets': ['protocol_analysis', 'requirement_specs'],
+                'two_column': ['system_comparison'],
+                'process_steps': ['flow_logic_sequence'],
+            },
+            'interactive': {
+                'title_bullets': ['group_collab', 'quiz_interaction'],
+                'title_content': ['role_play_scenario'],
+                'two_column': ['case_discussion'],
+            },
+            'practical': {
+                'title_bullets': ['checklist_verification'],
+                'two_column': ['equipment_orientation', 'common_faults'],
+                'title_content': ['task_instruction', 'detail_specs'],
+                'quote': ['technical_tip'],
+                'vertical_timeline': ['sop_vertical_steps'],
+            },
+            'visual': {
+                'image_full': ['field_observation'],
+                'two_column': ['case_before_after', 'site_survey'],
+                'title_bullets': ['infographic_flow'],
+                'portfolio': ['gallery_professional', 'portfolio_industry'],
+                'timeline': ['timeline_evolution'],
+                'detail_zoom': ['specimen_detail'],
+            },
+        }
+        direct_candidates_for_scheme = scheme_direct_base_candidates.get(scheme_id or 'edu_dark', {})
 
         ratio_layouts = ['section_title', 'title_content', 'title_bullets', 'two_column']
         special_layouts = ['process_steps', 'image_full', 'quote']
+
+        def layout_candidates_for_base(base_layout: str) -> List[str]:
+            preferred = [
+                lid for lid in direct_candidates_for_scheme.get(base_layout, [])
+                if lid in valid_layouts and lid not in {cover_id, toc_id, ending_id}
+            ]
+            aliased = [
+                lid for lid in scheme_layouts
+                if lid not in {cover_id, toc_id, ending_id}
+                and LAYOUT_ID_ALIASES.get(lid, lid) == base_layout
+            ]
+            return preferred + [lid for lid in aliased if lid not in preferred]
 
         def flatten_pages(outline_items: List[Dict]) -> List[Dict]:
             pages = []
@@ -127,14 +169,9 @@ class LayoutMixin:
             full_text = f"{title.lower()} {points_text}"
 
             if is_resource_page(full_text):
-                if is_tech_blue:
-                    page['layout_id'] = 'title_bullets'
-                else:
-                    candidates = [lid for lid in scheme_layouts
-                                  if lid not in {cover_id, toc_id, ending_id}
-                                  and LAYOUT_ID_ALIASES.get(lid, lid) == 'title_bullets']
-                    if candidates:
-                        page['layout_id'] = candidates[0]
+                candidates = layout_candidates_for_base('title_bullets')
+                if candidates:
+                    page['layout_id'] = candidates[0]
                 page['has_image'] = False
                 page['keywords'] = []
 
@@ -162,15 +199,10 @@ class LayoutMixin:
                 else:
                     base_layout = 'title_bullets'
 
-            if is_tech_blue:
-                layout = base_layout
-            else:
-                candidates = [lid for lid in scheme_layouts
-                              if lid not in {cover_id, toc_id, ending_id}
-                              and LAYOUT_ID_ALIASES.get(lid, lid) == base_layout]
-                if not candidates:
-                    candidates = [lid for lid in scheme_layouts if lid not in {cover_id, toc_id, ending_id}]
-                layout = candidates[idx % len(candidates)] if candidates else cover_id
+            candidates = layout_candidates_for_base(base_layout)
+            if not candidates:
+                candidates = [lid for lid in scheme_layouts if lid not in {cover_id, toc_id, ending_id}]
+            layout = candidates[idx % len(candidates)] if candidates else cover_id
 
             page['layout_id'] = layout if layout in valid_layouts else (scheme_layouts[0] if scheme_layouts else 'title_content')
             if is_resource_page(full_text):
@@ -311,7 +343,7 @@ class LayoutMixin:
         candidate_indices = [i for i in range(total) if i not in reserved_indices]
 
         kept_special_indices = set()
-        if is_tech_blue:
+        if legacy_tech_blue_distribution and is_tech_blue:
             special_cap = max(1, round(max(1, total - 3) * 0.2))
             for layout in special_layouts:
                 indices = [i for i in candidate_indices if pages[i].get('layout_id') == layout]
@@ -551,7 +583,7 @@ class LayoutMixin:
             if lid in valid_layouts:
                 final_counts[lid] = final_counts.get(lid, 0) + 1
         try:
-            if is_tech_blue:
+            if legacy_tech_blue_distribution and is_tech_blue:
                 ordered = {k: final_counts.get(k, 0) for k in [
                     'cover', 'toc', 'section_title', 'title_content', 'title_bullets',
                     'two_column', 'process_steps', 'image_full', 'quote', 'ending'

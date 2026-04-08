@@ -5,6 +5,15 @@ from typing import List, Dict, Optional, Any
 logger = logging.getLogger(__name__)
 
 
+def _is_scheme_toc_layout(layout_id: str, scheme_id: str = 'edu_dark') -> bool:
+    from services.prompts.layouts import SCHEME_ROLE_LAYOUTS
+
+    normalized = str(layout_id or '').lower()
+    role = SCHEME_ROLE_LAYOUTS.get(scheme_id, SCHEME_ROLE_LAYOUTS['edu_dark'])
+    toc_id = str(role.get('toc', 'toc') or 'toc').lower()
+    return normalized == toc_id or 'toc' in normalized
+
+
 class StructuredMixin:
 
     def _fix_empty_sections(self, outline: Dict, scheme_id: str = 'edu_dark') -> Dict:
@@ -124,7 +133,7 @@ class StructuredMixin:
 
         layout_id = page_outline.get('layout_id', 'title_content').lower()
 
-        if 'toc' in layout_id and full_outline:
+        if _is_scheme_toc_layout(layout_id, scheme_id) and full_outline:
             toc_model = self._generate_toc_model(page_outline, full_outline, language)
             if return_metadata:
                 return {'model': toc_model, 'closed_promise_ids': []}
@@ -559,7 +568,7 @@ class StructuredMixin:
             page_title = page_outline.get('title', f'第{idx+1}页')
             try:
                 continuity_context = tracker.build_context_for_page(page_id)
-                full_outline_for_prompt = outline if 'toc' in str(layout_id).lower() else None
+                full_outline_for_prompt = outline if _is_scheme_toc_layout(layout_id, scheme_id) else None
                 result = self.generate_structured_page_content(
                     page_outline=page_outline, full_outline=full_outline_for_prompt,
                     language=language, scheme_id=scheme_id, content_depth=content_depth,
@@ -610,7 +619,7 @@ class StructuredMixin:
                 if rewrite_instruction: rewrite_instruction += "。"
                 try:
                     rewrite_result = self.generate_structured_page_content(
-                        page_outline=po, full_outline=outline if 'toc' in str(po.get('layout_id', '')).lower() else None,
+                        page_outline=po, full_outline=outline if _is_scheme_toc_layout(str(po.get('layout_id', '')), scheme_id) else None,
                         language=language, scheme_id=scheme_id, content_depth=content_depth,
                         continuity_context=continuity_context, rewrite_instruction=rewrite_instruction,
                         thinking_budget=rewrite_budget, return_metadata=True
@@ -709,7 +718,7 @@ class StructuredMixin:
 
         layout_id = page_outline.get('layout_id', 'title_content').lower()
 
-        if 'toc' in layout_id and full_outline:
+        if _is_scheme_toc_layout(layout_id, scheme_id) and full_outline:
             toc_model = self._generate_toc_model(page_outline, full_outline, language)
             if return_metadata:
                 return {'model': toc_model, 'closed_promise_ids': []}
@@ -1030,7 +1039,7 @@ class StructuredMixin:
             page_title = page_outline.get('title', f'第{idx+1}页')
             try:
                 continuity_context = tracker.build_context_for_page(page_id)
-                full_outline_for_prompt = outline if 'toc' in str(layout_id).lower() else None
+                full_outline_for_prompt = outline if _is_scheme_toc_layout(layout_id, scheme_id) else None
                 result = await self.generate_structured_page_content_async(
                     page_outline=page_outline, full_outline=full_outline_for_prompt,
                     language=language, scheme_id=scheme_id, content_depth=content_depth,
@@ -1087,7 +1096,7 @@ class StructuredMixin:
                     rewrite_instruction += "。"
                 try:
                     rewrite_result = await self.generate_structured_page_content_async(
-                        page_outline=po, full_outline=outline if 'toc' in str(po.get('layout_id', '')).lower() else None,
+                        page_outline=po, full_outline=outline if _is_scheme_toc_layout(str(po.get('layout_id', '')), scheme_id) else None,
                         language=language, scheme_id=scheme_id, content_depth=content_depth,
                         continuity_context=continuity_context, rewrite_instruction=rewrite_instruction,
                         thinking_budget=rewrite_budget, return_metadata=True

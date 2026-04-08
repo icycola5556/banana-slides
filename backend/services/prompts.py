@@ -1781,3 +1781,17 @@ def get_quality_enhancement_prompt(inpainted_regions: list = None) -> str:
 # {regions_info}
 # """
     return prompt
+
+
+# Keep legacy module-level layout metadata aligned with the modular prompts package.
+from services.prompts.layouts import (  # noqa: E402
+    LAYOUT_ID_ALIASES as CANONICAL_LAYOUT_ID_ALIASES,
+    LAYOUT_SCHEMAS as CANONICAL_LAYOUT_SCHEMAS,
+    LAYOUT_SCHEMES as CANONICAL_LAYOUT_SCHEMES,
+    SCHEME_ROLE_LAYOUTS as CANONICAL_SCHEME_ROLE_LAYOUTS,
+)
+
+LAYOUT_SCHEMES = CANONICAL_LAYOUT_SCHEMES
+SCHEME_ROLE_LAYOUTS = CANONICAL_SCHEME_ROLE_LAYOUTS
+LAYOUT_ID_ALIASES = CANONICAL_LAYOUT_ID_ALIASES
+LAYOUT_SCHEMAS = CANONICAL_LAYOUT_SCHEMAS

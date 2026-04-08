@@ -61,6 +61,7 @@ export type LayoutId =
   | 'mind_map_structure'
   | 'quiz_interaction'
   | 'role_play_scenario'
+  | 'warmup_inquiry'
   | 'agenda_interactive'
   | 'warmup_question'
   | 'poll_interactive'
@@ -101,6 +102,16 @@ export type LayoutId =
   | 'blueprint_big_reveal'
   | 'blueprint_closing'
   // Visual scheme
+  | 'cover_field'
+  | 'timeline_evolution'
+  | 'field_observation'
+  | 'gallery_professional'
+  | 'case_before_after'
+  | 'infographic_flow'
+  | 'site_survey'
+  | 'specimen_detail'
+  | 'portfolio_industry'
+  | 'ending_field'
   | 'cover_visual'
   | 'timeline_navigation'
   | 'timeline'              // 专属布局（简化名称）
@@ -115,6 +126,14 @@ export type LayoutId =
   | 'ending_visual'
   // Practical scheme
   | 'cover_practical'
+  | 'checklist_verification'
+  | 'safety_protocol'
+  | 'equipment_orientation'
+  | 'sop_vertical_steps'
+  | 'task_instruction'
+  | 'common_faults'
+  | 'technical_tip'
+  | 'detail_specs'
   | 'checklist_practical'
   | 'safety_notice'
   | 'equipment_intro'
@@ -124,6 +143,17 @@ export type LayoutId =
   | 'tip_trick'
   | 'practice_exercise'
   | 'ending_practical'
+  // Tech blue scheme
+  | 'cover_tech'
+  | 'toc_tech'
+  | 'arch_blocks'
+  | 'flow_logic_sequence'
+  | 'param_dashboard'
+  | 'protocol_analysis'
+  | 'requirement_specs'
+  | 'system_comparison'
+  | 'tech_principle'
+  | 'ending_tech'
   // Modern scheme - 现代创新方案
   | 'sidebar_card'           // 左侧导航卡片 - 适合目录
   | 'dark_math'              // 科技深色分割 - 适合公式/硬核概念

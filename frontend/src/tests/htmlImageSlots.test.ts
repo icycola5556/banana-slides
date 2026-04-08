@@ -267,6 +267,189 @@ describe('htmlImageSlots utils', () => {
     ]);
   });
 
+  it('collects direct weak-template image slots without collapsing them back to generic paths', () => {
+    const inferTwoColumnPartType = () => 'text' as const;
+
+    expect(
+      collectHtmlImageSlotDescriptors(
+        'flow_logic_sequence',
+        { image: { src: '' } },
+        { inferTwoColumnPartType }
+      )
+    ).toEqual([
+      { slotPath: 'image.src', slotRole: 'main', src: '' },
+    ]);
+
+    expect(
+      collectHtmlImageSlotDescriptors(
+        'requirement_specs',
+        { image: { src: '' } },
+        { inferTwoColumnPartType }
+      )
+    ).toEqual([
+      { slotPath: 'image.src', slotRole: 'main', src: '' },
+    ]);
+
+    expect(
+      collectHtmlImageSlotDescriptors(
+        'mind_map_structure',
+        { image_src: '' },
+        { inferTwoColumnPartType }
+      )
+    ).toEqual([
+      { slotPath: 'image_src', slotRole: 'main', src: '' },
+    ]);
+
+    expect(
+      collectHtmlImageSlotDescriptors(
+        'quiz_interaction',
+        { image: { src: '' } },
+        { inferTwoColumnPartType }
+      )
+    ).toEqual([
+      { slotPath: 'image.src', slotRole: 'main', src: '' },
+    ]);
+
+    expect(
+      collectHtmlImageSlotDescriptors(
+        'role_play_scenario',
+        { image: { src: '' } },
+        { inferTwoColumnPartType }
+      )
+    ).toEqual([
+      { slotPath: 'image.src', slotRole: 'main', src: '' },
+    ]);
+
+    expect(
+      collectHtmlImageSlotDescriptors(
+        'task_instruction',
+        { image: { src: '' } },
+        { inferTwoColumnPartType }
+      )
+    ).toEqual([
+      { slotPath: 'image.src', slotRole: 'main', src: '' },
+    ]);
+
+    expect(
+      collectHtmlImageSlotDescriptors(
+        'common_faults',
+        {
+          left: { type: 'image', image_src: '' },
+          right: { type: 'image', image_src: '' },
+        },
+        { inferTwoColumnPartType }
+      )
+    ).toEqual([
+      { slotPath: 'left.image_src', slotRole: 'left', src: '' },
+      { slotPath: 'right.image_src', slotRole: 'right', src: '' },
+    ]);
+
+    expect(
+      collectHtmlImageSlotDescriptors(
+        'detail_specs',
+        { image: { src: '' } },
+        { inferTwoColumnPartType }
+      )
+    ).toEqual([
+      { slotPath: 'image.src', slotRole: 'main', src: '' },
+    ]);
+
+    expect(
+      collectHtmlImageSlotDescriptors(
+        'system_comparison',
+        {
+          left: { type: 'image', image_src: '' },
+          right: { type: 'image', image_src: '' },
+        },
+        { inferTwoColumnPartType }
+      )
+    ).toEqual([
+      { slotPath: 'left.image_src', slotRole: 'left', src: '' },
+      { slotPath: 'right.image_src', slotRole: 'right', src: '' },
+    ]);
+
+    expect(
+      collectHtmlImageSlotDescriptors(
+        'tech_principle',
+        { image: { src: '' } },
+        { inferTwoColumnPartType }
+      )
+    ).toEqual([
+      { slotPath: 'image.src', slotRole: 'main', src: '' },
+    ]);
+
+    expect(
+      collectHtmlImageSlotDescriptors(
+        'field_observation',
+        { image_src: '' },
+        { inferTwoColumnPartType }
+      )
+    ).toEqual([
+      { slotPath: 'image_src', slotRole: 'main', src: '' },
+    ]);
+
+    expect(
+      collectHtmlImageSlotDescriptors(
+        'infographic_flow',
+        { image: { src: '' } },
+        { inferTwoColumnPartType }
+      )
+    ).toEqual([
+      { slotPath: 'image.src', slotRole: 'main', src: '' },
+    ]);
+
+    expect(
+      collectHtmlImageSlotDescriptors(
+        'specimen_detail',
+        { image_src: '' },
+        { inferTwoColumnPartType }
+      )
+    ).toEqual([
+      { slotPath: 'image_src', slotRole: 'main', src: '' },
+    ]);
+
+    expect(
+      collectHtmlImageSlotDescriptors(
+        'case_discussion',
+        { case_image: '' },
+        { inferTwoColumnPartType }
+      )
+    ).toEqual([
+      { slotPath: 'case_image', slotRole: 'left', src: '' },
+    ]);
+
+    expect(
+      collectHtmlImageSlotDescriptors(
+        'equipment_orientation',
+        { equipment_image: '' },
+        { inferTwoColumnPartType }
+      )
+    ).toEqual([
+      { slotPath: 'equipment_image', slotRole: 'left', src: '' },
+    ]);
+
+    expect(
+      collectHtmlImageSlotDescriptors(
+        'case_before_after',
+        { before: { image_src: '' }, after: { image_src: '' } },
+        { inferTwoColumnPartType }
+      )
+    ).toEqual([
+      { slotPath: 'before.image_src', slotRole: 'left', src: '' },
+      { slotPath: 'after.image_src', slotRole: 'right', src: '' },
+    ]);
+
+    expect(
+      collectHtmlImageSlotDescriptors(
+        'site_survey',
+        { overview_image: '' },
+        { inferTwoColumnPartType }
+      )
+    ).toEqual([
+      { slotPath: 'overview_image', slotRole: 'left', src: '' },
+    ]);
+  });
+
   it('treats content image slots with template artwork as empty by default for all themes', () => {
     const inferTwoColumnPartType = () => 'text' as const;
 

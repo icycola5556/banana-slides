@@ -158,6 +158,7 @@ import {
   VaultCompareLayout,
   VaultDebriefLayout,
 } from '../layouts/vault';
+import { renderPhaseOneWeakLayoutNode } from '../layouts/phaseOneWeakLayouts';
 import { getLayoutDisplayName, normalizeLayoutId, resolveThemeLayout } from '../layouts';
 
 interface SlideRendererProps {
@@ -376,6 +377,15 @@ export const SlideRenderer: React.FC<SlideRendererProps> = ({
     try {
       console.log('[SlideRenderer] Rendering layout:', normalizedLayoutId, 'model:', model);
       const enrichedModel = { ...(model as Record<string, unknown>), layoutId: layout_id };
+      const directWeakNode = renderPhaseOneWeakLayoutNode(
+        normalizedLayoutId,
+        model as Record<string, unknown>,
+        theme,
+        onImageUpload,
+      );
+      if (directWeakNode) {
+        return directWeakNode;
+      }
       switch (normalizedLayoutId) {
       case 'cover':
         return <CoverLayout model={model as CoverModel} theme={theme} onImageUpload={onImageUpload ? () => onImageUpload('background_image') : undefined} />;

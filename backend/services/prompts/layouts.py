@@ -223,51 +223,15 @@ LAYOUT_ID_ALIASES = {
     'key_takeaways': 'title_bullets',
     'ending_academic': 'ending',
     # Interactive
-    'cover_interactive': 'cover',
-    'agenda_path': 'toc',
     'story_narrative': 'title_content',
-    'group_collab': 'title_bullets',
-    'mind_map_structure': 'image_full',
-    'quiz_interaction': 'title_bullets',
-    'discussion_card': 'title_content',
-    'reflection_quiz': 'title_bullets',
-    'role_play_scenario': 'title_content',
     'warmup_inquiry': 'warmup_question',
-    'ending_interactive': 'ending',
-    'case_discussion': 'title_content',
     # Visual
-    'cover_field': 'cover',
-    'timeline_evolution': 'timeline',
-    'field_observation': 'image_full',
     'gallery_professional': 'portfolio',
-    'case_before_after': 'two_column',
-    'infographic_flow': 'title_bullets',
-    'site_survey': 'image_full',
-    'specimen_detail': 'detail_zoom',
     'portfolio_industry': 'portfolio',
-    'ending_field': 'ending',
     # Practical
-    'cover_practical': 'cover',
-    'checklist_verification': 'title_bullets',
-    'equipment_orientation': 'two_column',
     'sop_vertical_steps': 'vertical_timeline',
-    'common_faults': 'two_column',
     'technical_tip': 'quote',
-    'task_instruction': 'title_content',
-    'safety_protocol': 'safety_notice',
-    'detail_specs': 'title_content',
-    'ending_practical': 'ending',
     # Tech Blue
-    'cover_tech': 'cover',
-    'arch_blocks': 'title_content',
-    'flow_logic_sequence': 'process_steps',
-    'param_dashboard': 'edu_data_board',
-    'protocol_analysis': 'title_bullets',
-    'requirement_specs': 'title_bullets',
-    'system_comparison': 'two_column',
-    'tech_principle': 'title_content',
-    'toc_tech': 'toc',
-    'ending_tech': 'ending',
     # Modern (Management)
     'cover_modern': 'cover',
     'business_canvas': 'grid_matrix',
@@ -351,6 +315,98 @@ LAYOUT_SCHEMAS = {'cinematic_overlay': '{"label": "标签(如CASE STUDY)", "titl
  'vertical_timeline': '{"title": "时间线标题", "events": [{"title": "事件标题", "description": "事件描述", "is_highlighted": '
                       'false}], "accent_color": "#27ae60", "background_image": "背景图片URL(可选)"}',
  'warmup_question': '{"question": "思考问题", "thinkTime": 30, "hints": ["提示1", "提示2"], "background_image": "背景图片URL(可选)"}'}
+
+
+for deprecated_layout_id in (
+    'discussion_card',
+    'reflection_quiz',
+    'arch_blocks',
+    'param_dashboard',
+    'protocol_analysis',
+    'feedback_poll',
+    'group_collab',
+    'case_discussion',
+    'checklist_verification',
+    'safety_protocol',
+    'equipment_orientation',
+    'field_observation',
+    'case_before_after',
+    'site_survey',
+    'flow_logic_sequence',
+    'requirement_specs',
+    'quiz_interaction',
+    'role_play_scenario',
+    'mind_map_structure',
+    'task_instruction',
+    'common_faults',
+    'detail_specs',
+    'system_comparison',
+    'tech_principle',
+    'infographic_flow',
+    'specimen_detail',
+    'agenda_path',
+    'timeline_evolution',
+    'toc_tech',
+    'ending_tech',
+    'cover_tech',
+    'cover_interactive',
+    'ending_interactive',
+    'cover_field',
+    'ending_field',
+    'cover_practical',
+    'ending_practical',
+):
+    LAYOUT_ID_ALIASES.pop(deprecated_layout_id, None)
+
+LAYOUT_ID_ALIASES.update({
+    'story_narrative': 'title_content',
+    'warmup_inquiry': 'warmup_question',
+    'gallery_professional': 'portfolio',
+    'portfolio_industry': 'portfolio',
+    'sop_vertical_steps': 'vertical_timeline',
+    'technical_tip': 'quote',
+})
+
+LAYOUT_SCHEMAS.update({
+    'cover_tech': '{"title": "技术封面标题", "subtitle": "封面副标题(可选)", "author": "汇报人(可选)", "department": "团队或部门(可选)", "date": "日期或版本(可选)", "background_image": "背景图片URL(可选)"}',
+    'toc_tech': '{"title": "技术大纲标题", "subtitle": "导航说明(可选)", "items": [{"index": 1, "text": "章节标题", "description": "章节摘要(可选)"}], "summary": "总体路线提示(可选)", "background_image": "背景图片URL(可选)"}',
+    'ending_tech': '{"title": "技术复盘标题", "subtitle": "结束说明(可选)", "reflection_blocks": [{"title": "复盘维度标题", "items": ["复盘要点1", "复盘要点2"]}], "closing": "技术收束金句(可选)", "contact": "联系方式(可选)", "background_image": "背景图片URL(可选)"}',
+    'agenda_path': '{"title": "学程地图标题", "subtitle": "路径说明(可选)", "items": [{"index": 1, "text": "学习阶段", "description": "阶段目标(可选)"}], "instruction": "互动提示(可选)", "background_image": "背景图片URL(可选)"}',
+    'arch_blocks': '{"title": "架构标题", "blocks": [{"title": "模块名", "description": "模块职责说明"}], "highlight": "架构判断或边界结论(可选)", "image": {"src": "配图URL(可选)", "alt": "配图说明(可选)", "position": "right", "width": "42%"}, "background_image": "背景图片URL(可选)"}',
+    'param_dashboard': '{"title": "指标看板标题", "subtitle": "指标范围说明(可选)", "metrics": [{"value": "97%", "label": "指标名称", "note": "指标备注(可选)"}], "bars": [{"label": "维度名称", "baseline": 60, "current": 85}], "bullets": [{"text": "看板结论", "description": "对指标的解释"}], "insight": "关键洞察(可选)", "background_image": "背景图片URL(可选)"}',
+    'flow_logic_sequence': '{"title": "逻辑时序标题", "subtitle": "链路说明(可选)", "steps": [{"number": 1, "label": "步骤名称", "description": "步骤说明(可选)", "icon": "图标(可选)"}], "image": {"src": "配图URL(可选)", "alt": "配图说明(可选)", "position": "right", "width": "42%"}, "background_image": "背景图片URL(可选)"}',
+    'protocol_analysis': '{"title": "协议拆解标题", "subtitle": "字段作用范围(可选)", "fields": [{"name": "字段名", "definition": "字段定义", "example": "示例(可选)", "note": "注意事项(可选)"}], "keyTakeaway": "字段约束结论(可选)", "image": {"src": "配图URL(可选)", "alt": "配图说明(可选)", "position": "right", "width": "38%"}, "background_image": "背景图片URL(可选)"}',
+    'requirement_specs': '{"title": "需求规格标题", "subtitle": "适用范围(可选)", "requirements": [{"text": "规格项", "description": "验收标准或补充说明"}], "keyTakeaway": "规格结论(可选)", "image": {"src": "配图URL(可选)", "alt": "配图说明(可选)", "position": "right", "width": "38%"}, "background_image": "背景图片URL(可选)"}',
+    'quiz_interaction': '{"title": "交互测验标题", "subtitle": "测验说明(可选)", "bullets": [{"text": "选项文本", "description": "判题提示或解释(可选)"}], "keyTakeaway": "正确答案或测验结论(可选)", "image": {"src": "配图URL(可选)", "alt": "配图说明(可选)", "position": "right", "width": "38%"}, "background_image": "背景图片URL(可选)"}',
+    'role_play_scenario': '{"title": "情境模拟标题", "content": ["场景描述"], "highlight": "角色目标或判断提醒(可选)", "image": {"src": "配图URL(可选)", "alt": "配图说明(可选)", "position": "right", "width": "42%"}, "background_image": "背景图片URL(可选)"}',
+    'feedback_poll': '{"question": "即时反馈问题", "options": [{"text": "选项文本", "emoji": "图标(可选)"}], "instruction": "反馈说明(可选)", "background_image": "背景图片URL(可选)"}',
+    'group_collab': '{"title": "协作任务标题", "subtitle": "协作场景(可选)", "tasks": [{"text": "任务或角色", "description": "分工与产出要求"}], "keyTakeaway": "协作提醒(可选)", "background_image": "背景图片URL(可选)"}',
+    'case_discussion': '{"title": "案例研讨标题", "scenario_title": "案例背景标题(可选)", "scenario": ["案例背景段落"], "case_image": "案例图片URL(可选)", "prompt_title": "讨论引导标题(可选)", "prompt": ["讨论说明(可选)"], "discussion_points": [{"text": "讨论问题", "description": "希望学生回答的角度"}], "expected_outputs": [{"text": "输出物", "description": "小组需要提交的内容"}], "background_image": "背景图片URL(可选)"}',
+    'mind_map_structure': '{"title": "知识脑图标题", "image_src": "脑图图片URL", "image_alt": "脑图说明(可选)", "caption": "脑图结论或讲解(可选)", "background_image": "背景图片URL(可选)"}',
+    'checklist_verification': '{"title": "核查清单标题", "subtitle": "执行阶段说明(可选)", "checklist": [{"text": "核查项", "description": "判定标准或补充说明"}], "keyTakeaway": "检查结论(可选)", "background_image": "背景图片URL(可选)"}',
+    'task_instruction': '{"title": "工单指令标题", "content": ["执行说明"], "highlight": "关键提醒(可选)", "image": {"src": "配图URL(可选)", "alt": "配图说明(可选)", "position": "right", "width": "42%"}, "background_image": "背景图片URL(可选)"}',
+    'common_faults': '{"title": "故障排除标题", "left": {"type": "bullets/text/image", "header": "错误现象标题", "content": ["错误说明(可选)"], "bullets": [{"text": "错误现象", "description": "现象解释"}], "image_src": "错误侧图片URL(可选)", "image_alt": "错误侧图片说明(可选)"}, "right": {"type": "bullets/text/image", "header": "处理动作标题", "content": ["修复说明(可选)"], "bullets": [{"text": "处理动作", "description": "修复解释"}], "image_src": "修复侧图片URL(可选)", "image_alt": "修复侧图片说明(可选)"}, "background_image": "背景图片URL(可选)"}',
+    'detail_specs': '{"title": "精度规格标题", "content": ["规格说明"], "highlight": "验收结论或关键参数提醒(可选)", "image": {"src": "配图URL(可选)", "alt": "配图说明(可选)", "position": "right", "width": "42%"}, "background_image": "背景图片URL(可选)"}',
+    'system_comparison': '{"title": "技术选型对比标题", "left": {"type": "bullets/text/image", "header": "方案A标题", "content": ["方案A说明(可选)"], "bullets": [{"text": "方案A要点", "description": "方案A解释"}], "image_src": "方案A图片URL(可选)", "image_alt": "方案A图片说明(可选)"}, "right": {"type": "bullets/text/image", "header": "方案B标题", "content": ["方案B说明(可选)"], "bullets": [{"text": "方案B要点", "description": "方案B解释"}], "image_src": "方案B图片URL(可选)", "image_alt": "方案B图片说明(可选)"}, "background_image": "背景图片URL(可选)"}',
+    'tech_principle': '{"title": "技术原理标题", "principles": ["核心原理说明"], "highlight": "关键技术结论(可选)", "image": {"src": "配图URL(可选)", "alt": "配图说明(可选)", "position": "right", "width": "42%"}, "background_image": "背景图片URL(可选)"}',
+    'infographic_flow': '{"title": "图文信息流标题", "subtitle": "阶段说明(可选)", "flow": [{"text": "信息节点", "description": "节点解释"}], "keyTakeaway": "图文流结论(可选)", "image": {"src": "配图URL(可选)", "alt": "配图说明(可选)", "position": "right", "width": "38%"}, "background_image": "背景图片URL(可选)"}',
+    'specimen_detail': '{"title": "标本特写标题", "image_src": "标本图片URL", "annotations": [{"x": 24, "y": 32, "label": "A", "description": "局部特征说明"}], "background_image": "背景图片URL(可选)"}',
+    'safety_protocol': '{"title": "安全禁令标题", "warnings": [{"level": "danger/warning/caution", "text": "安全要求", "icon": "图标(可选)"}], "summary": "安全总结(可选)", "background_image": "背景图片URL(可选)"}',
+    'equipment_orientation': '{"title": "设备认知标题", "equipment_name": "设备名称(可选)", "equipment_summary": ["设备说明(可选)"], "equipment_image": "设备图片URL(可选)", "components_title": "关键部件标题(可选)", "components": [{"text": "部件名", "description": "部件作用说明"}], "background_image": "背景图片URL(可选)"}',
+    'field_observation': '{"title": "现场观测标题", "image_src": "现场图片URL", "image_alt": "图片说明(可选)", "caption": "观察结论(可选)", "background_image": "背景图片URL(可选)"}',
+    'timeline_evolution': '{"title": "演进轴线标题", "events": [{"year": "01", "title": "节点标题", "description": "节点说明"}], "items": [{"index": 1, "text": "章节标题", "description": "章节摘要(可选)"}], "orientation": "horizontal", "background_image": "背景图片URL(可选)"}',
+    'case_before_after': '{"title": "前后对比标题", "before": {"title": "改造前标题", "summary": ["改造前说明(可选)"], "image_src": "改造前图片URL(可选)", "points": [{"text": "改造前问题", "description": "问题说明"}]}, "after": {"title": "改造后标题", "summary": ["改造后说明(可选)"], "image_src": "改造后图片URL(可选)", "points": [{"text": "改造后变化", "description": "变化说明"}]}, "background_image": "背景图片URL(可选)"}',
+    'site_survey': '{"title": "踏勘报告标题", "left_title": "现场总览标题(可选)", "overview_summary": ["现场总览说明(可选)"], "overview_image": "踏勘图片URL(可选)", "right_title": "观察结论标题(可选)", "observations": [{"text": "观察点", "description": "观察说明"}], "caption": ["补充说明(可选)"], "background_image": "背景图片URL(可选)"}',
+})
+
+LAYOUT_SCHEMAS.update({
+    'cover_interactive': '{"title": "互动封面标题", "subtitle": "课堂导入副标题(可选)", "author": "教师或主持人(可选)", "department": "课程或项目组(可选)", "date": "场次或日期(可选)", "background_image": "背景图片URL(可选)"}',
+    'ending_interactive': '{"title": "互动收束标题", "subtitle": "课堂收束说明(可选)", "reflection_blocks": [{"title": "回顾维度标题", "items": ["回顾要点1", "回顾要点2"]}], "closing": "下步行动或金句(可选)", "contact": "补充说明(可选)", "background_image": "背景图片URL(可选)"}',
+    'cover_practical': '{"title": "实训封面标题", "subtitle": "实训任务副标题(可选)", "author": "讲师或负责人(可选)", "department": "实训组或车间(可选)", "date": "班次或日期(可选)", "background_image": "背景图片URL(可选)"}',
+    'ending_practical': '{"title": "实训收束标题", "subtitle": "交付说明(可选)", "reflection_blocks": [{"title": "交付维度标题", "items": ["交付物1", "交付物2"]}], "closing": "交付结论或提醒(可选)", "contact": "补充说明(可选)", "background_image": "背景图片URL(可选)"}',
+    'cover_field': '{"title": "现场封面标题", "subtitle": "项目或观察副标题(可选)", "author": "作者或策展人(可选)", "department": "项目组或工作室(可选)", "date": "档期或时间(可选)", "background_image": "背景图片URL(可选)"}',
+    'ending_field': '{"title": "现场收束标题", "subtitle": "视觉收束说明(可选)", "reflection_blocks": [{"title": "视觉回顾维度", "items": ["视觉要点1", "视觉要点2"]}], "closing": "结尾金句或愿景(可选)", "contact": "补充说明(可选)", "background_image": "背景图片URL(可选)"}',
+})
 
 
 def get_layout_scheme(scheme_id: Optional[str] = None) -> dict:
@@ -469,6 +525,22 @@ def get_scheme_style_prompt(scheme_id: Optional[str] = None) -> str:
 def resolve_layout_id(layout_id: str) -> str:
     return LAYOUT_ID_ALIASES.get(layout_id, layout_id)
 
+
+DIRECT_TOC_ROLE_LAYOUT_IDS = {'agenda_path', 'timeline_evolution', 'toc_tech'}
+
+
+def is_toc_layout(layout_id: Optional[str], scheme_id: Optional[str] = None) -> bool:
+    normalized = str(layout_id or '').strip().lower()
+    if not normalized:
+        return False
+
+    if scheme_id:
+        scheme_roles = SCHEME_ROLE_LAYOUTS.get(scheme_id or 'edu_dark', SCHEME_ROLE_LAYOUTS['edu_dark'])
+        toc_id = str(scheme_roles.get('toc', 'toc') or 'toc').strip().lower()
+        if normalized == toc_id:
+            return True
+
+    return 'toc' in normalized or normalized in DIRECT_TOC_ROLE_LAYOUT_IDS
 
 
 def get_layout_constraints(scheme_id: Optional[str] = None) -> str:
