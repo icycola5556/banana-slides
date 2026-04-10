@@ -8,7 +8,9 @@
       "Bash(node -e \":*)",
       "Bash(node:*)",
       "Bash(npx tsc:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ]
   }
 }

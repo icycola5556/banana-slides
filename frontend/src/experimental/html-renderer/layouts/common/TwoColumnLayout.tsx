@@ -1,8 +1,8 @@
 /**
- * 左右双栏布局组件
+ * 左右双栏布局组件 - 支持动态字体调整和预览/导出一致性
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { TwoColumnModel, ColumnContent, ThemeConfig } from '../../types/schema';
 import { ImageSlotFrame } from '../../components/ImageSlotFrame';
 import {
@@ -11,6 +11,14 @@ import {
   getTitleStyle,
   getImagePlaceholderStyle,
 } from '../../utils/styleHelper';
+import {
+  calculateAdaptiveTitleSize,
+  calculateAdaptiveFontSize,
+  getStandardDimensions,
+  getAvailableContentHeight,
+  getAvailableContentWidth,
+  estimateTotalLength,
+} from '../../utils/layoutAdapter';
 
 interface TwoColumnLayoutProps {
   model: TwoColumnModel;
@@ -34,8 +42,73 @@ function normalizeContentLines(content: ColumnContent['content']): string[] {
     .filter(Boolean);
 }
 
+/**
+ * 估算两栏内容的总文字量
+ */
+function estimateColumnContent(left: ColumnContent, right: ColumnContent): number {
+  let totalLength = 0;
+
+  // 左栏文字
+  const leftContent = normalizeContentLines(left.content);
+  totalLength += estimateTotalLength(leftContent);
+
+  if (left.bullets && left.bullets.length > 0) {
+    const bulletTexts = left.bullets.map(b => `${b.text || ''} ${b.description || ''}`);
+    totalLength += estimateTotalLength(bulletTexts);
+  }
+
+  // 右栏文字
+  const rightContent = normalizeContentLines(right.content);
+  totalLength += estimateTotalLength(rightContent);
+
+  if (right.bullets && right.bullets.length > 0) {
+    const bulletTexts = right.bullets.map(b => `${b.text || ''} ${b.description || ''}`);
+    totalLength += estimateTotalLength(bulletTexts);
+  }
+
+  return totalLength;
+}
+
+/**
+ * 共享的布局计算逻辑 - React和HTML导出共用
+ */
+function calculateLayoutStyles(
+  model: TwoColumnModel,
+  theme: ThemeConfig
+) {
+  const { title, left, right } = model;
+  const dims = getStandardDimensions(theme);
+
+  // 计算标题字体大小
+  const titleSize = calculateAdaptiveTitleSize(title?.length || 0);
+
+  // 计算内容区域尺寸 - 两栏布局，可用宽度减半
+  const availableHeight = getAvailableContentHeight(dims) - 40;
+  const availableWidth = getAvailableContentWidth(dims) * 0.45; // 每栏约45%宽度
+
+  // 计算正文字体大小 - 基于两栏总文字量
+  const totalTextLength = estimateColumnContent(left, right);
+  const contentFontSize = calculateAdaptiveFontSize(totalTextLength, availableHeight, availableWidth);
+
+  // 栏目标题字体大小
+  const headerFontSize = Math.max(16, Math.min(24, contentFontSize + 2));
+
+  return {
+    titleSize,
+    contentFontSize,
+    headerFontSize,
+    dims,
+    availableHeight,
+    availableWidth,
+  };
+}
+
 export const TwoColumnLayout: React.FC<TwoColumnLayoutProps> = ({ model, theme, onImageUpload }) => {
   const { title, left, right, background_image } = model;
+
+  // 使用共享的布局计算
+  const layout = useMemo(() => calculateLayoutStyles(model, theme), [model, theme]);
+  const { titleSize, contentFontSize, headerFontSize } = layout;
 
   const slideStyle: React.CSSProperties = {
     ...getBaseSlideStyle(theme),
@@ -48,7 +121,11 @@ export const TwoColumnLayout: React.FC<TwoColumnLayoutProps> = ({ model, theme, 
       }
       : {}),
   };
-  const titleStyle = toInlineStyle({ ...getTitleStyle(theme), textShadow: '0 1px 2px rgba(0,0,0,0.1)' });
+  const titleStyle = toInlineStyle({
+    ...getTitleStyle(theme),
+    fontSize: `${titleSize}px`,
+    textShadow: '0 1px 2px rgba(0,0,0,0.1)'
+  });
 
   const columnsContainerStyle = toInlineStyle({
     marginTop: '40px',
@@ -72,6 +149,8 @@ export const TwoColumnLayout: React.FC<TwoColumnLayoutProps> = ({ model, theme, 
             content={left}
             theme={theme}
             onImageUpload={onImageUpload ? () => onImageUpload('left.image_src') : undefined}
+            fontSize={contentFontSize}
+            headerFontSize={headerFontSize}
           />
         </div>
         <div style={parseStyle(columnStyle)}>
@@ -79,27 +158,33 @@ export const TwoColumnLayout: React.FC<TwoColumnLayoutProps> = ({ model, theme, 
             content={right}
             theme={theme}
             onImageUpload={onImageUpload ? () => onImageUpload('right.image_src') : undefined}
+            fontSize={contentFontSize}
+            headerFontSize={headerFontSize}
           />
         </div>
       </div>
     </section>
   );
-};
+}
 
 const ColumnRenderer: React.FC<{
   content: ColumnContent;
   theme: ThemeConfig;
   onImageUpload?: () => void;
+  fontSize?: number;
+  headerFontSize?: number;
 }> = ({
   content,
   theme,
   onImageUpload,
+  fontSize,
+  headerFontSize,
 }) => {
     const resolvedType = resolveColumnType(content);
     const contentArray = normalizeContentLines(content.content);
 
     const headerStyle = toInlineStyle({
-      fontSize: '24px',
+      fontSize: `${headerFontSize || 24}px`,
       fontWeight: '600',
       color: theme.colors.secondary,
       margin: '0',
@@ -107,7 +192,7 @@ const ColumnRenderer: React.FC<{
     });
 
     const textStyle = toInlineStyle({
-      fontSize: theme.sizes.bodySize,
+      fontSize: `${fontSize || 18}px`,
       color: theme.colors.text,
       lineHeight: '1.8',
       margin: '0',
@@ -145,29 +230,29 @@ const ColumnRenderer: React.FC<{
     });
 
     const bulletTitleStyle = toInlineStyle({
-      fontSize: theme.sizes.bodySize,
+      fontSize: `${fontSize || 18}px`,
       color: theme.colors.text,
       lineHeight: '1.8',
       margin: '0',
     });
 
     const bulletDescriptionStyle = toInlineStyle({
-      fontSize: '14px',
+      fontSize: `${Math.max(12, (fontSize || 18) - 4)}px`,
       color: theme.colors.textLight,
       lineHeight: '1.6',
       margin: '0',
     });
 
     const bulletIconStyle = toInlineStyle({
-      width: '24px',
-      height: '24px',
+      width: fontSize ? `${Math.max(20, fontSize - 2)}px` : '24px',
+      height: fontSize ? `${Math.max(20, fontSize - 2)}px` : '24px',
       borderRadius: '50%',
       backgroundColor: theme.colors.accent,
       color: '#ffffff',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      fontSize: '12px',
+      fontSize: fontSize ? `${Math.max(10, fontSize - 6)}px` : '12px',
       flexShrink: '0',
       marginTop: '2px',
     });
@@ -266,6 +351,10 @@ const ColumnRenderer: React.FC<{
 export function renderTwoColumnLayoutHTML(model: TwoColumnModel, theme: ThemeConfig): string {
   const { title, left, right, background_image } = model;
 
+  // 使用共享的布局计算
+  const layout = calculateLayoutStyles(model, theme);
+  const { titleSize, contentFontSize, headerFontSize } = layout;
+
   const slideStyle = toInlineStyle({
     width: `${theme.sizes.slideWidth}px`,
     height: `${theme.sizes.slideHeight}px`,
@@ -287,7 +376,7 @@ export function renderTwoColumnLayoutHTML(model: TwoColumnModel, theme: ThemeCon
   });
 
   const titleStyle = toInlineStyle({
-    fontSize: theme.sizes.titleSize,
+    fontSize: `${titleSize}px`,
     fontWeight: 'bold',
     color: theme.colors.primary,
     margin: '0',
@@ -312,7 +401,7 @@ export function renderTwoColumnLayoutHTML(model: TwoColumnModel, theme: ThemeCon
     const contentArray = normalizeContentLines(content.content);
 
     const headerStyle = toInlineStyle({
-      fontSize: '24px',
+      fontSize: `${headerFontSize}px`,
       fontWeight: '600',
       color: theme.colors.secondary,
       margin: '0',
@@ -320,7 +409,7 @@ export function renderTwoColumnLayoutHTML(model: TwoColumnModel, theme: ThemeCon
     });
 
     const textStyle = toInlineStyle({
-      fontSize: theme.sizes.bodySize,
+      fontSize: `${contentFontSize}px`,
       color: theme.colors.text,
       lineHeight: '1.8',
       margin: '0',
@@ -358,29 +447,29 @@ export function renderTwoColumnLayoutHTML(model: TwoColumnModel, theme: ThemeCon
     });
 
     const bulletTitleStyle = toInlineStyle({
-      fontSize: theme.sizes.bodySize,
+      fontSize: `${contentFontSize}px`,
       color: theme.colors.text,
       lineHeight: '1.8',
       margin: '0',
     });
 
     const bulletDescriptionStyle = toInlineStyle({
-      fontSize: '14px',
+      fontSize: `${Math.max(12, contentFontSize - 4)}px`,
       color: theme.colors.textLight,
       lineHeight: '1.6',
       margin: '0',
     });
 
     const bulletIconStyle = toInlineStyle({
-      width: '24px',
-      height: '24px',
+      width: `${Math.max(20, contentFontSize - 2)}px`,
+      height: `${Math.max(20, contentFontSize - 2)}px`,
       borderRadius: '50%',
       backgroundColor: theme.colors.accent,
       color: '#ffffff',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      fontSize: '12px',
+      fontSize: `${Math.max(10, contentFontSize - 6)}px`,
       flexShrink: '0',
       marginTop: '2px',
     });

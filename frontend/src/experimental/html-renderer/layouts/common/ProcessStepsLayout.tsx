@@ -1,9 +1,9 @@
 /**
- * 流程步骤布局组件
+ * 流程步骤布局组件 - 支持动态字体调整和预览/导出一致性
  * 支持有图/无图两种渲染模式
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { ProcessStepsModel, ThemeConfig } from '../../types/schema';
 import { ImageSlotFrame } from '../../components/ImageSlotFrame';
 import {
@@ -12,6 +12,14 @@ import {
   getTitleStyle,
   getSubtitleStyle,
 } from '../../utils/styleHelper';
+import {
+  calculateAdaptiveTitleSize,
+  calculateAdaptiveFontSize,
+  getStandardDimensions,
+  getAvailableContentHeight,
+  getAvailableContentWidth,
+  estimateTotalLength,
+} from '../../utils/layoutAdapter';
 
 interface ProcessStepsLayoutProps {
   model: ProcessStepsModel;
@@ -19,13 +27,67 @@ interface ProcessStepsLayoutProps {
   onImageUpload?: () => void; // 图片上传回调
 }
 
+/**
+ * 估算步骤内容的总文字量
+ */
+function estimateStepsContent(steps: Array<{ label: string; description?: string }>): number {
+  const texts = steps.map(s => `${s.label || ''} ${s.description || ''}`);
+  return estimateTotalLength(texts);
+}
+
+/**
+ * 共享的布局计算逻辑 - React和HTML导出共用
+ */
+function calculateLayoutStyles(
+  model: ProcessStepsModel,
+  theme: ThemeConfig,
+  hasImage: boolean
+) {
+  const { title, steps } = model;
+  const stepsArray = steps || [];
+  const dims = getStandardDimensions(theme);
+
+  // 计算标题字体大小
+  const titleSize = calculateAdaptiveTitleSize(title?.length || 0);
+
+  // 计算内容区域尺寸
+  const availableHeight = getAvailableContentHeight(dims) - 60; // 留出步骤指示器空间
+  const availableWidth = getAvailableContentWidth(dims);
+
+  // 计算步骤文字字体大小 - 基于总文字量
+  const totalTextLength = estimateStepsContent(stepsArray);
+
+  // 有图模式可用高度更小
+  const effectiveHeight = hasImage ? availableHeight * 0.4 : availableHeight;
+  // 步骤通常横向排列，所以按步骤数分配宽度
+  const stepWidth = availableWidth / Math.max(stepsArray.length, 1);
+
+  const contentFontSize = calculateAdaptiveFontSize(
+    totalTextLength,
+    effectiveHeight,
+    stepWidth * 0.9
+  );
+
+  return {
+    titleSize,
+    contentFontSize,
+    dims,
+    availableHeight,
+    availableWidth,
+  };
+}
+
 export const ProcessStepsLayout: React.FC<ProcessStepsLayoutProps> = ({ model, theme, onImageUpload }) => {
   const { title, subtitle, steps, image, background_image } = model;
   const hasImage = image && (image.src || image.src === '');
   const variant = String(model.variant || 'a').toLowerCase();
 
+  // 使用共享的布局计算
+  const layout = useMemo(() => calculateLayoutStyles(model, theme, !!hasImage), [model, theme, hasImage]);
+  const { titleSize, contentFontSize } = layout;
+
   if (variant === 'b') {
-    return renderProcessStepsVariantB(model, theme, onImageUpload);
+    return renderProcessStepsVariantB(model, theme, onImageUpload, titleSize, contentFontSize);
   }
 
   const slideStyle: React.CSSProperties = {
@@ -39,8 +101,15 @@ export const ProcessStepsLayout: React.FC<ProcessStepsLayoutProps> = ({ model, t
       }
       : {}),
   };
-  const titleStyle = toInlineStyle({ ...getTitleStyle(theme), textShadow: '0 1px 2px rgba(0,0,0,0.1)' });
-  const subtitleStyle = toInlineStyle(getSubtitleStyle(theme));
+  const titleStyle = toInlineStyle({
+    ...getTitleStyle(theme),
+    fontSize: `${titleSize}px`,
+    textShadow: '0 1px 2px rgba(0,0,0,0.1)'
+  });
+  const subtitleStyle = toInlineStyle({
+    ...getSubtitleStyle(theme),
+    fontSize: `${Math.max(14, contentFontSize - 2)}px`,
+  });
 
   // 有图模式：步骤在上，图片在下
   if (hasImage) {
@@ -93,7 +162,7 @@ export const ProcessStepsLayout: React.FC<ProcessStepsLayoutProps> = ({ model, t
         <div style={parseStyle(stepsContainerStyle)}>
           <div style={parseStyle(connectorStyle)} />
           {steps.map((step, index) => (
-            <StepCard key={index} step={step} theme={theme} compact />
+            <StepCard key={index} step={step} theme={theme} compact fontSize={contentFontSize} />
           ))}
         </div>
         <div style={parseStyle(imageContainerStyle)}>
@@ -150,7 +219,8 @@ const StepCard: React.FC<{
   step: { number: number; label: string; description?: string; icon?: string };
   theme: ThemeConfig;
   compact?: boolean;
-}> = ({ step, theme, compact }) => {
+  fontSize?: number;
+}> = ({ step, theme, compact, fontSize }) => {
   const cardStyle = toInlineStyle({
     flex: '1',
     display: 'flex',
@@ -161,30 +231,37 @@ const StepCard: React.FC<{
     zIndex: '1',
   });
 
+  const circleSize = fontSize
+    ? (compact ? Math.max(48, fontSize * 2.5) : Math.max(64, fontSize * 3))
+    : (compact ? '60px' : '80px');
+  const circleFontSize = fontSize
+    ? (compact ? Math.max(16, fontSize + 2) : Math.max(20, fontSize + 4))
+    : (compact ? '22px' : '28px');
+
   const circleStyle = toInlineStyle({
-    width: compact ? '60px' : '80px',
-    height: compact ? '60px' : '80px',
+    width: circleSize,
+    height: circleSize,
     borderRadius: '50%',
     backgroundColor: theme.colors.secondary,
     color: '#ffffff',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: compact ? '22px' : '28px',
+    fontSize: circleFontSize,
     fontWeight: 'bold',
     marginBottom: compact ? '12px' : '20px',
     boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
   });
 
   const labelStyle = toInlineStyle({
-    fontSize: compact ? '16px' : '20px',
+    fontSize: fontSize ? `${fontSize}px` : (compact ? '16px' : '20px'),
     fontWeight: '600',
     color: theme.colors.text,
     margin: '0',
   });
 
   const descriptionStyle = toInlineStyle({
-    fontSize: compact ? '12px' : '14px',
+    fontSize: fontSize ? `${Math.max(12, fontSize - 4)}px` : (compact ? '12px' : '14px'),
     color: theme.colors.textLight,
     margin: '0',
     marginTop: '6px',
@@ -214,8 +291,12 @@ export function renderProcessStepsLayoutHTML(model: ProcessStepsModel, theme: Th
   const hasImage = image && (image.src !== undefined);
   const variant = String(model.variant || 'a').toLowerCase();
 
+  // 使用共享的布局计算
+  const layout = calculateLayoutStyles(model, theme, !!hasImage);
+  const { titleSize, contentFontSize } = layout;
+
   if (variant === 'b') {
-    return renderProcessStepsVariantBHTML(model, theme);
+    return renderProcessStepsVariantBHTML(model, theme, titleSize, contentFontSize);
   }
 
   const slideStyle = toInlineStyle({
@@ -239,7 +320,7 @@ export function renderProcessStepsLayoutHTML(model: ProcessStepsModel, theme: Th
   });
 
   const titleStyle = toInlineStyle({
-    fontSize: theme.sizes.titleSize,
+    fontSize: `${titleSize}px`,
     fontWeight: 'bold',
     color: theme.colors.primary,
     margin: '0',
@@ -248,7 +329,7 @@ export function renderProcessStepsLayoutHTML(model: ProcessStepsModel, theme: Th
   });
 
   const subtitleStyle = toInlineStyle({
-    fontSize: theme.sizes.subtitleSize,
+    fontSize: `${Math.max(14, contentFontSize - 2)}px`,
     color: theme.colors.textLight,
     margin: '0',
     marginTop: '12px',
@@ -351,7 +432,7 @@ export function renderProcessStepsLayoutHTML(model: ProcessStepsModel, theme: Th
     zIndex: '0',
   });
 
-  const stepsHTML = steps.map((step) => renderStepCardHTML(step, theme, false)).join('\n    ');
+  const stepsHTML = steps.map((step) => renderStepCardHTML(step, theme, false, contentFontSize)).join('\n    ');
 
   return `<section style="${slideStyle}">
   <h2 style="${titleStyle}">${title}</h2>
@@ -366,7 +447,8 @@ export function renderProcessStepsLayoutHTML(model: ProcessStepsModel, theme: Th
 function renderStepCardHTML(
   step: { number: number; label: string; description?: string; icon?: string },
   theme: ThemeConfig,
-  compact: boolean
+  compact: boolean,
+  fontSize?: number
 ): string {
   const cardStyle = toInlineStyle({
     flex: '1',
@@ -378,30 +460,37 @@ function renderStepCardHTML(
     zIndex: '1',
   });
 
+  const circleSize = fontSize
+    ? (compact ? Math.max(48, fontSize * 2.5) : Math.max(64, fontSize * 3))
+    : (compact ? '60px' : '80px');
+  const circleFontSize = fontSize
+    ? (compact ? Math.max(16, fontSize + 2) : Math.max(20, fontSize + 4))
+    : (compact ? '22px' : '28px');
+
   const circleStyle = toInlineStyle({
-    width: compact ? '60px' : '80px',
-    height: compact ? '60px' : '80px',
+    width: circleSize,
+    height: circleSize,
     borderRadius: '50%',
     backgroundColor: theme.colors.secondary,
     color: '#ffffff',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: compact ? '22px' : '28px',
+    fontSize: circleFontSize,
     fontWeight: 'bold',
     marginBottom: compact ? '12px' : '20px',
     boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
   });
 
   const labelStyle = toInlineStyle({
-    fontSize: compact ? '16px' : '20px',
+    fontSize: fontSize ? `${fontSize}px` : (compact ? '16px' : '20px'),
     fontWeight: '600',
     color: theme.colors.text,
     margin: '0',
   });
 
   const descriptionStyle = toInlineStyle({
-    fontSize: compact ? '12px' : '14px',
+    fontSize: fontSize ? `${Math.max(12, fontSize - 4)}px` : (compact ? '12px' : '14px'),
     color: theme.colors.textLight,
     margin: '0',
     marginTop: '6px',
@@ -440,11 +529,18 @@ export default ProcessStepsLayout;
 function renderProcessStepsVariantB(
   model: ProcessStepsModel,
   theme: ThemeConfig,
-  onImageUpload?: () => void
+  onImageUpload?: () => void,
+  titleSize?: number,
+  contentFontSize?: number
 ): React.ReactElement {
   const steps = (model.steps || []).slice(0, 4);
   const palette = ['#06b6d4', '#3b82f6', '#10b981', '#f59e0b'];
   const fallbackSteps = steps.length > 0 ? steps : [{ number: 1, label: model.title || '步骤', description: '围绕目标设计并推进执行。' }];
+
+  const titleFontSize = titleSize || 42;
+  const subtitleFontSize = contentFontSize ? Math.max(14, contentFontSize + 2) : 22;
+  const stepTitleFontSize = contentFontSize ? Math.max(16, contentFontSize + 4) : 24;
+  const descFontSize = contentFontSize || 16;
 
   return (
     <section
@@ -475,10 +571,10 @@ function renderProcessStepsVariantB(
       >
         <div style={{ display: 'flex', alignItems: 'center' }}>
           <div style={{ width: 8, height: 40, borderRadius: 4, background: '#06b6d4', marginRight: 18 }} />
-          <h2 style={{ margin: 0, color: '#ffffff', fontSize: 42, fontWeight: 800, lineHeight: 1.2 }}>{model.title}</h2>
+          <h2 style={{ margin: 0, color: '#ffffff', fontSize: titleFontSize, fontWeight: 800, lineHeight: 1.2 }}>{model.title}</h2>
         </div>
         {model.subtitle && (
-          <div style={{ color: '#93c5fd', fontSize: 22, lineHeight: 1.4, maxWidth: 420, textAlign: 'right' }}>
+          <div style={{ color: '#93c5fd', fontSize: subtitleFontSize, lineHeight: 1.4, maxWidth: 420, textAlign: 'right' }}>
             {model.subtitle}
           </div>
         )}
@@ -506,13 +602,13 @@ function renderProcessStepsVariantB(
               <div key={`${step.label}-${index}`} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                 <div
                   style={{
-                    width: 64,
-                    height: 64,
+                    width: contentFontSize ? Math.max(48, contentFontSize * 2.5) : 64,
+                    height: contentFontSize ? Math.max(48, contentFontSize * 2.5) : 64,
                     borderRadius: '50%',
                     border: `4px solid ${color}`,
                     background: '#0b1120',
                     color,
-                    fontSize: 28,
+                    fontSize: contentFontSize ? Math.max(20, contentFontSize + 4) : 28,
                     fontWeight: 800,
                     display: 'flex',
                     alignItems: 'center',
@@ -539,10 +635,10 @@ function renderProcessStepsVariantB(
                     boxSizing: 'border-box',
                   }}
                 >
-                  <h3 style={{ margin: '0 0 16px 0', color, fontSize: 24, textAlign: 'center', lineHeight: 1.3 }}>
+                  <h3 style={{ margin: '0 0 16px 0', color, fontSize: stepTitleFontSize, textAlign: 'center', lineHeight: 1.3 }}>
                     {step.label}
                   </h3>
-                  <p style={{ margin: 0, color: '#cbd5e1', fontSize: 16, lineHeight: 1.7 }}>
+                  <p style={{ margin: 0, color: '#cbd5e1', fontSize: descFontSize, lineHeight: 1.7 }}>
                     {description}
                   </p>
                 </div>
@@ -574,13 +670,25 @@ function renderProcessStepsVariantB(
   );
 }
 
-function renderProcessStepsVariantBHTML(model: ProcessStepsModel, theme: ThemeConfig): string {
+function renderProcessStepsVariantBHTML(
+  model: ProcessStepsModel,
+  theme: ThemeConfig,
+  titleSize?: number,
+  contentFontSize?: number
+): string {
   const steps = (model.steps || []).slice(0, 4);
   const palette = ['#06b6d4', '#3b82f6', '#10b981', '#f59e0b'];
   const fallbackSteps = steps.length > 0 ? steps : [{ number: 1, label: model.title || '步骤', description: '围绕目标设计并推进执行。' }];
   const background = model.background_image
     ? `url(${model.background_image}) center/cover no-repeat`
     : '#0b1120';
+
+  const titleFontSize = titleSize || 42;
+  const subtitleFontSize = contentFontSize ? Math.max(14, contentFontSize + 2) : 22;
+  const stepTitleFontSize = contentFontSize ? Math.max(16, contentFontSize + 4) : 24;
+  const descFontSize = contentFontSize || 16;
+  const circleSize = contentFontSize ? Math.max(48, contentFontSize * 2.5) : 64;
+  const circleFontSize = contentFontSize ? Math.max(20, contentFontSize + 4) : 28;
 
   const stepHTML = fallbackSteps.map((step, index) => {
     const color = palette[index % palette.length];
@@ -589,16 +697,16 @@ function renderProcessStepsVariantBHTML(model: ProcessStepsModel, theme: ThemeCo
     const head = iconClass ? `<i class="${iconClass}"></i>` : stepNo;
     const description = step.description || '明确阶段目标、执行动作和交付结果。';
     return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;">
-      <div style="width:64px;height:64px;border-radius:50%;border:4px solid ${color};background:#0b1120;color:${color};font-size:28px;font-weight:800;display:flex;align-items:center;justify-content:center;margin-bottom:26px;box-sizing:border-box;box-shadow:0 0 18px ${color}55;">${head}</div>
+      <div style="width:${circleSize}px;height:${circleSize}px;border-radius:50%;border:4px solid ${color};background:#0b1120;color:${color};font-size:${circleFontSize}px;font-weight:800;display:flex;align-items:center;justify-content:center;margin-bottom:26px;box-sizing:border-box;box-shadow:0 0 18px ${color}55;">${head}</div>
       <div style="width:100%;flex:1;border-radius:16px;border:1px solid rgba(255,255,255,0.1);border-top:4px solid ${color};background:${index === 0 ? 'linear-gradient(180deg, rgba(6,182,212,0.14), rgba(0,0,0,0.05))' : 'rgba(255,255,255,0.03)'};padding:28px 24px;box-sizing:border-box;">
-        <h3 style="margin:0 0 16px 0;color:${color};font-size:24px;text-align:center;line-height:1.3;">${step.label}</h3>
-        <p style="margin:0;color:#cbd5e1;font-size:16px;line-height:1.7;">${description}</p>
+        <h3 style="margin:0 0 16px 0;color:${color};font-size:${stepTitleFontSize}px;text-align:center;line-height:1.3;">${step.label}</h3>
+        <p style="margin:0;color:#cbd5e1;font-size:${descFontSize}px;line-height:1.7;">${description}</p>
       </div>
     </div>`;
   }).join('\n');
 
   const subtitleHTML = model.subtitle
-    ? `<div style="color:#93c5fd;font-size:22px;line-height:1.4;max-width:420px;text-align:right;">${model.subtitle}</div>`
+    ? `<div style="color:#93c5fd;font-size:${subtitleFontSize}px;line-height:1.4;max-width:420px;text-align:right;">${model.subtitle}</div>`
     : '';
   const imageDockHTML = model.image?.src
     ? `<div style="position:absolute;right:84px;bottom:24px;width:140px;height:100px;border-radius:10px;overflow:hidden;border:1px solid rgba(255,255,255,0.2);"><img src="${model.image.src}" alt="${model.image.alt || ''}" style="width:100%;height:100%;object-fit:cover;" /></div>`
@@ -608,7 +716,7 @@ function renderProcessStepsVariantBHTML(model: ProcessStepsModel, theme: ThemeCo
   <div style="display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid rgba(6,182,212,0.3);padding-bottom:20px;margin-bottom:56px;">
     <div style="display:flex;align-items:center;">
       <div style="width:8px;height:40px;border-radius:4px;background:#06b6d4;margin-right:18px;"></div>
-      <h2 style="margin:0;color:#ffffff;font-size:42px;font-weight:800;line-height:1.2;">${model.title}</h2>
+      <h2 style="margin:0;color:#ffffff;font-size:${titleFontSize}px;font-weight:800;line-height:1.2;">${model.title}</h2>
     </div>
     ${subtitleHTML}
   </div>
