@@ -1,9 +1,9 @@
 /**
- * 标题+要点布局组件
+ * 标题+要点布局组件 - 支持动态字体调整和预览/导出一致性
  * 支持有图/无图两种渲染模式
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { TitleBulletsModel, ThemeConfig } from '../../types/schema';
 import { ImageSlotFrame } from '../../components/ImageSlotFrame';
 import {
@@ -13,6 +13,14 @@ import {
   getSubtitleStyle,
   getCardStyle,
 } from '../../utils/styleHelper';
+import {
+  calculateAdaptiveTitleSize,
+  calculateAdaptiveFontSize,
+  getStandardDimensions,
+  getAvailableContentHeight,
+  getAvailableContentWidth,
+  estimateTotalLength,
+} from '../../utils/layoutAdapter';
 
 interface TitleBulletsLayoutProps {
   model: TitleBulletsModel;
@@ -39,11 +47,55 @@ function shouldUseSimpleBullets(bullets: BulletItem[]): boolean {
   return bullets.every((bullet) => !bullet.example && !bullet.note && !bullet.dataPoint);
 }
 
+/**
+ * 共享的布局计算逻辑 - React和HTML导出共用
+ */
+function calculateLayoutStyles(
+  model: TitleBulletsModel,
+  theme: ThemeConfig,
+  hasImage: boolean
+) {
+  const { title, subtitle, bullets } = model;
+  const dims = getStandardDimensions(theme);
+  const bulletsArray = Array.isArray(bullets) ? bullets : [];
+
+  // 计算标题字体大小
+  const titleSize = calculateAdaptiveTitleSize(title?.length || 0);
+
+  // 计算内容区域尺寸
+  const availableHeight = getAvailableContentHeight(dims) - 40;
+  const availableWidth = getAvailableContentWidth(dims);
+
+  // 计算要点字体大小 - 基于总文本量
+  const bulletTexts = bulletsArray.map(b => {
+    const bItem = b as BulletItem;
+    return `${bItem.text || ''} ${bItem.description || ''} ${bItem.example || ''} ${bItem.note || ''}`;
+  });
+  const totalTextLength = estimateTotalLength(bulletTexts);
+
+  const contentFontSize = hasImage
+    ? calculateAdaptiveFontSize(totalTextLength, availableHeight, availableWidth * 0.55)
+    : calculateAdaptiveFontSize(totalTextLength, availableHeight, availableWidth);
+
+  return {
+    titleSize,
+    contentFontSize,
+    bulletsArray,
+    dims,
+    availableHeight,
+    availableWidth,
+  };
+}
+
 export const TitleBulletsLayout: React.FC<TitleBulletsLayoutProps> = ({ model, theme, onImageUpload }) => {
   const variant = String((model as any).variant || 'a').toLowerCase();
   const { title, subtitle, bullets, image, background_image } = model;
   const hasImage = image && (image.src || image.src === '');
   const useSimpleBullets = shouldUseSimpleBullets(bullets as BulletItem[]);
+
+  // 使用共享的布局计算
+  const layout = useMemo(() => calculateLayoutStyles(model, theme, !!hasImage), [model, theme, hasImage]);
+  const { titleSize, contentFontSize } = layout;
 
   if (variant === 'b') {
     return (
@@ -54,6 +106,8 @@ export const TitleBulletsLayout: React.FC<TitleBulletsLayoutProps> = ({ model, t
         keyTakeaway={model.keyTakeaway}
         background_image={background_image}
         theme={theme}
+        titleSize={titleSize}
+        contentFontSize={contentFontSize}
       />
     );
   }
@@ -69,8 +123,15 @@ export const TitleBulletsLayout: React.FC<TitleBulletsLayoutProps> = ({ model, t
       }
       : {}),
   };
-  const titleStyle = toInlineStyle({ ...getTitleStyle(theme), textShadow: '0 1px 2px rgba(0,0,0,0.1)' });
-  const subtitleStyle = toInlineStyle(getSubtitleStyle(theme));
+  const titleStyle = toInlineStyle({
+    ...getTitleStyle(theme),
+    fontSize: `${titleSize}px`,
+    textShadow: '0 1px 2px rgba(0,0,0,0.1)'
+  });
+  const subtitleStyle = toInlineStyle({
+    ...getSubtitleStyle(theme),
+    fontSize: `${Math.max(14, contentFontSize - 4)}px`,
+  });
 
   // 有图模式：左侧要点列表 + 右侧图片
   if (hasImage) {
@@ -128,10 +189,10 @@ export const TitleBulletsLayout: React.FC<TitleBulletsLayoutProps> = ({ model, t
           <div style={parseStyle(bulletsColumnStyle)}>
             {useSimpleBullets
               ? bullets.map((bullet, index) => (
-                <SimpleBulletLine key={index} bullet={bullet} theme={theme} />
+                <SimpleBulletLine key={index} bullet={bullet} theme={theme} fontSize={contentFontSize} />
               ))
               : bullets.map((bullet, index) => (
-                <BulletCard key={index} bullet={bullet} theme={theme} compact />
+                <BulletCard key={index} bullet={bullet} theme={theme} compact fontSize={contentFontSize} />
               ))}
           </div>
           <div style={parseStyle(imageColumnStyle)}>
@@ -176,7 +237,7 @@ export const TitleBulletsLayout: React.FC<TitleBulletsLayoutProps> = ({ model, t
       {subtitle && <p style={parseStyle(subtitleStyle)}>{subtitle}</p>}
       <div style={parseStyle(bulletsContainerStyle)}>
         {bullets.map((bullet, index) => (
-          <BulletCard key={index} bullet={bullet} theme={theme} />
+          <BulletCard key={index} bullet={bullet} theme={theme} fontSize={contentFontSize} />
         ))}
       </div>
 
@@ -193,18 +254,29 @@ export const TitleBulletsLayout: React.FC<TitleBulletsLayoutProps> = ({ model, t
 const TitleBulletsVariantB: React.FC<{
   title: string; subtitle?: string; bullets: BulletItem[];
   keyTakeaway?: string; background_image?: string; theme: ThemeConfig;
-}> = ({ title, subtitle, bullets, keyTakeaway, background_image, theme }) => {
+  titleSize?: number; contentFontSize?: number;
+}> = ({ title, subtitle, bullets, keyTakeaway, background_image, theme, titleSize, contentFontSize }) => {
   const slideStyle: React.CSSProperties = {
     ...getBaseSlideStyle(theme),
     ...(background_image ? { backgroundImage: `linear-gradient(rgba(255,255,255,0.85), rgba(255,255,255,0.85)), url(${background_image})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}),
   };
-  const titleStyle = parseStyle(toInlineStyle({ ...getTitleStyle(theme), textShadow: '0 1px 2px rgba(0,0,0,0.1)' }));
-  const subtitleStyleObj = parseStyle(toInlineStyle(getSubtitleStyle(theme)));
+  const titleStyle = parseStyle(toInlineStyle({
+    ...getTitleStyle(theme),
+    fontSize: titleSize ? `${titleSize}px` : undefined,
+    textShadow: '0 1px 2px rgba(0,0,0,0.1)'
+  }));
+  const subtitleStyleObj = parseStyle(toInlineStyle({
+    ...getSubtitleStyle(theme),
+    fontSize: contentFontSize ? `${Math.max(14, contentFontSize - 4)}px` : undefined,
+  }));
   const ktStyle = parseStyle(toInlineStyle({
     marginTop: '24px', padding: '16px 20px', backgroundColor: theme.colors.backgroundAlt,
     borderRadius: theme.decorations?.borderRadius || '12px', borderLeft: `4px solid ${theme.colors.primary}`,
-    fontSize: theme.sizes.bodySize, color: theme.colors.text, lineHeight: '1.5',
+    fontSize: contentFontSize ? `${contentFontSize}px` : theme.sizes.bodySize,
+    color: theme.colors.text, lineHeight: '1.5',
   }));
+  const bulletFontSize = contentFontSize || 20;
+  const descFontSize = contentFontSize ? Math.max(12, contentFontSize - 4) : 15;
   return (
     <section style={slideStyle}>
       <h2 style={titleStyle}>{title}</h2>
@@ -213,13 +285,16 @@ const TitleBulletsVariantB: React.FC<{
         {bullets.map((bullet, index) => (
           <div key={index} style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
             <div style={{
-              width: 36, height: 36, borderRadius: '50%', backgroundColor: theme.colors.secondary,
+              width: contentFontSize ? Math.max(28, contentFontSize + 8) : 36,
+              height: contentFontSize ? Math.max(28, contentFontSize + 8) : 36,
+              borderRadius: '50%', backgroundColor: theme.colors.secondary,
               color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 18, fontWeight: 700, flexShrink: 0,
+              fontSize: contentFontSize ? Math.max(14, contentFontSize - 2) : 18,
+              fontWeight: 700, flexShrink: 0,
             }}>{index + 1}</div>
             <div style={{ flex: 1 }}>
-              <p style={{ margin: 0, fontSize: 20, fontWeight: 600, color: theme.colors.text }}>{bullet.text}</p>
-              {bullet.description && <p style={{ margin: '4px 0 0', fontSize: 15, color: theme.colors.textLight, lineHeight: 1.5 }}>{bullet.description}</p>}
+              <p style={{ margin: 0, fontSize: bulletFontSize, fontWeight: 600, color: theme.colors.text }}>{bullet.text}</p>
+              {bullet.description && <p style={{ margin: '4px 0 0', fontSize: descFontSize, color: theme.colors.textLight, lineHeight: 1.5 }}>{bullet.description}</p>}
             </div>
           </div>
         ))}
@@ -233,7 +308,8 @@ const BulletCard: React.FC<{
   bullet: BulletItem;
   theme: ThemeConfig;
   compact?: boolean;
-}> = ({ bullet, theme, compact }) => {
+  fontSize?: number;
+}> = ({ bullet, theme, compact, fontSize }) => {
   // 使用getCardStyle应用主题装饰配置
   const baseCardStyle = getCardStyle(theme);
   const cardStyle = toInlineStyle({
@@ -265,14 +341,14 @@ const BulletCard: React.FC<{
   });
 
   const bulletTextStyle = toInlineStyle({
-    fontSize: compact ? '17px' : '20px',
+    fontSize: fontSize ? `${fontSize}px` : (compact ? '17px' : '20px'),
     fontWeight: '600',
     color: theme.colors.text,
     margin: '0',
   });
 
   const descriptionStyle = toInlineStyle({
-    fontSize: compact ? '14px' : '16px',
+    fontSize: fontSize ? `${Math.max(12, fontSize - 4)}px` : (compact ? '14px' : '16px'),
     color: theme.colors.textLight,
     margin: '0',
     lineHeight: '1.5',
@@ -364,7 +440,8 @@ const BulletCard: React.FC<{
 const SimpleBulletLine: React.FC<{
   bullet: BulletItem;
   theme: ThemeConfig;
-}> = ({ bullet, theme }) => {
+  fontSize?: number;
+}> = ({ bullet, theme, fontSize }) => {
   const rowStyle = toInlineStyle({
     display: 'flex',
     alignItems: 'flex-start',
@@ -372,15 +449,15 @@ const SimpleBulletLine: React.FC<{
   });
 
   const markerStyle = toInlineStyle({
-    width: '22px',
-    height: '22px',
+    width: fontSize ? `${Math.max(18, fontSize - 2)}px` : '22px',
+    height: fontSize ? `${Math.max(18, fontSize - 2)}px` : '22px',
     borderRadius: '50%',
     backgroundColor: theme.colors.secondary,
     color: '#ffffff',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: '11px',
+    fontSize: fontSize ? `${Math.max(10, fontSize - 8)}px` : '11px',
     flexShrink: '0',
     marginTop: '3px',
   });
@@ -392,7 +469,7 @@ const SimpleBulletLine: React.FC<{
   });
 
   const titleStyle = toInlineStyle({
-    fontSize: '18px',
+    fontSize: fontSize ? `${fontSize}px` : '18px',
     lineHeight: '1.5',
     color: theme.colors.text,
     margin: '0',
@@ -400,7 +477,7 @@ const SimpleBulletLine: React.FC<{
   });
 
   const descriptionStyle = toInlineStyle({
-    fontSize: '14px',
+    fontSize: fontSize ? `${Math.max(12, fontSize - 4)}px` : '14px',
     lineHeight: '1.6',
     color: theme.colors.textLight,
     margin: '0',
@@ -432,6 +509,10 @@ export function renderTitleBulletsLayoutHTML(model: TitleBulletsModel, theme: Th
   const hasImage = image && (image.src !== undefined);
   const useSimpleBullets = shouldUseSimpleBullets(bullets as BulletItem[]);
 
+  // 使用共享的布局计算
+  const layout = calculateLayoutStyles(model, theme, !!hasImage);
+  const { titleSize, contentFontSize } = layout;
+
   const slideStyle = toInlineStyle({
     width: `${theme.sizes.slideWidth}px`,
     height: `${theme.sizes.slideHeight}px`,
@@ -453,7 +534,7 @@ export function renderTitleBulletsLayoutHTML(model: TitleBulletsModel, theme: Th
   });
 
   const titleStyle = toInlineStyle({
-    fontSize: theme.sizes.titleSize,
+    fontSize: `${titleSize}px`,
     fontWeight: 'bold',
     color: theme.colors.primary,
     margin: '0',
@@ -511,8 +592,8 @@ export function renderTitleBulletsLayoutHTML(model: TitleBulletsModel, theme: Th
     });
 
     const bulletsHTML = useSimpleBullets
-      ? bullets.map((bullet) => renderSimpleBulletLineHTML(bullet, theme)).join('\n      ')
-      : bullets.map((bullet) => renderBulletCardHTML(bullet, theme, true)).join('\n      ');
+      ? bullets.map((bullet) => renderSimpleBulletLineHTML(bullet, theme, contentFontSize)).join('\n      ')
+      : bullets.map((bullet) => renderBulletCardHTML(bullet, theme, true, contentFontSize)).join('\n      ');
 
     let imageHTML = '';
     if (image.src) {
@@ -572,7 +653,7 @@ export function renderTitleBulletsLayoutHTML(model: TitleBulletsModel, theme: Th
     gap: '24px',
   });
 
-  const bulletsHTML = bullets.map((bullet) => renderBulletCardHTML(bullet, theme, false)).join('\n    ');
+  const bulletsHTML = bullets.map((bullet) => renderBulletCardHTML(bullet, theme, false, contentFontSize)).join('\n    ');
 
   return `<section style="${slideStyle}">
   <h2 style="${titleStyle}">${title}</h2>
@@ -588,6 +669,15 @@ function renderTitleBulletsVariantBHTML(model: TitleBulletsModel, theme: ThemeCo
   const { title, subtitle, bullets, image, keyTakeaway, background_image } = model;
   const hasImage = image && (image.src !== undefined);
   const palette = ['#06b6d4', '#3b82f6', '#8b5cf6', '#f59e0b', '#10b981', '#ef4444'];
+
+  // 使用共享的布局计算
+  const layout = calculateLayoutStyles(model, theme, !!hasImage);
+  const { titleSize, contentFontSize } = layout;
+
+  const bulletFontSize = contentFontSize;
+  const descFontSize = Math.max(12, contentFontSize - 4);
+  const markerSize = Math.max(20, contentFontSize);
+  const markerFontSize = Math.max(11, contentFontSize - 6);
 
   const slideStyle = toInlineStyle({
     width: `${theme.sizes.slideWidth}px`,
@@ -609,7 +699,7 @@ function renderTitleBulletsVariantBHTML(model: TitleBulletsModel, theme: ThemeCo
   });
 
   const titleStyle = toInlineStyle({
-    fontSize: theme.sizes.titleSize,
+    fontSize: `${titleSize}px`,
     fontWeight: 'bold',
     color: theme.colors.primary,
     margin: '0',
@@ -618,7 +708,7 @@ function renderTitleBulletsVariantBHTML(model: TitleBulletsModel, theme: ThemeCo
   });
 
   const subtitleStyle = toInlineStyle({
-    fontSize: theme.sizes.subtitleSize,
+    fontSize: `${Math.max(14, contentFontSize - 4)}px`,
     color: theme.colors.textLight,
     margin: '0',
     marginTop: '12px',
@@ -629,10 +719,10 @@ function renderTitleBulletsVariantBHTML(model: TitleBulletsModel, theme: ThemeCo
     const color = palette[index % palette.length];
     const b = bullet as BulletItem;
     return `<div style="display:flex;align-items:flex-start;gap:16px;margin-bottom:${index < bullets.length - 1 ? '20px' : '0'};position:relative;">
-      <div style="position:absolute;left:-32px;top:2px;width:24px;height:24px;border-radius:50%;background-color:${color};color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;z-index:1;">${index + 1}</div>
+      <div style="position:absolute;left:-32px;top:2px;width:${markerSize}px;height:${markerSize}px;border-radius:50%;background-color:${color};color:#fff;display:flex;align-items:center;justify-content:center;font-size:${markerFontSize}px;font-weight:bold;z-index:1;">${index + 1}</div>
       <div style="flex:1;">
-        <p style="font-size:18px;font-weight:600;color:${theme.colors.text};margin:0 0 4px 0;line-height:1.4;">${b.text}</p>
-        ${b.description ? `<p style="font-size:14px;color:${theme.colors.textLight};margin:0;line-height:1.5;">${b.description}</p>` : ''}
+        <p style="font-size:${bulletFontSize}px;font-weight:600;color:${theme.colors.text};margin:0 0 4px 0;line-height:1.4;">${b.text}</p>
+        ${b.description ? `<p style="font-size:${descFontSize}px;color:${theme.colors.textLight};margin:0;line-height:1.5;">${b.description}</p>` : ''}
       </div>
     </div>`;
   }).join('\n');
@@ -646,7 +736,7 @@ function renderTitleBulletsVariantBHTML(model: TitleBulletsModel, theme: ThemeCo
     }
   }
 
-  const keyTakeawayHTML = keyTakeaway ? `<div style="margin-top:20px;padding:14px 18px;background-color:${theme.colors.backgroundAlt};border-radius:${theme.decorations?.borderRadius || '12px'};border-left:4px solid ${theme.colors.primary};font-size:${theme.sizes.bodySize};color:${theme.colors.text};line-height:1.5;"><strong>🎯 核心要点：</strong>${keyTakeaway}</div>` : '';
+  const keyTakeawayHTML = keyTakeaway ? `<div style="margin-top:20px;padding:14px 18px;background-color:${theme.colors.backgroundAlt};border-radius:${theme.decorations?.borderRadius || '12px'};border-left:4px solid ${theme.colors.primary};font-size:${contentFontSize}px;color:${theme.colors.text};line-height:1.5;"><strong>🎯 核心要点：</strong>${keyTakeaway}</div>` : '';
 
   return `<section style="${slideStyle}">
   <h2 style="${titleStyle}">${title}</h2>
@@ -665,7 +755,8 @@ function renderTitleBulletsVariantBHTML(model: TitleBulletsModel, theme: ThemeCo
 function renderBulletCardHTML(
   bullet: BulletItem,
   theme: ThemeConfig,
-  compact: boolean
+  compact: boolean,
+  fontSize?: number
 ): string {
   const cardStyle = toInlineStyle({
     padding: compact ? '16px 20px' : '24px',
@@ -697,14 +788,14 @@ function renderBulletCardHTML(
   });
 
   const bulletTextStyle = toInlineStyle({
-    fontSize: compact ? '17px' : '20px',
+    fontSize: fontSize ? `${fontSize}px` : (compact ? '17px' : '20px'),
     fontWeight: '600',
     color: theme.colors.text,
     margin: '0',
   });
 
   const descriptionStyle = toInlineStyle({
-    fontSize: compact ? '14px' : '16px',
+    fontSize: fontSize ? `${Math.max(12, fontSize - 4)}px` : (compact ? '14px' : '16px'),
     color: theme.colors.textLight,
     margin: '0',
     marginTop: '6px',
@@ -771,7 +862,7 @@ function renderBulletCardHTML(
     </div>`;
 }
 
-function renderSimpleBulletLineHTML(bullet: BulletItem, theme: ThemeConfig): string {
+function renderSimpleBulletLineHTML(bullet: BulletItem, theme: ThemeConfig, fontSize?: number): string {
   const rowStyle = toInlineStyle({
     display: 'flex',
     alignItems: 'flex-start',
@@ -779,15 +870,15 @@ function renderSimpleBulletLineHTML(bullet: BulletItem, theme: ThemeConfig): str
   });
 
   const markerStyle = toInlineStyle({
-    width: '22px',
-    height: '22px',
+    width: fontSize ? `${Math.max(18, fontSize - 2)}px` : '22px',
+    height: fontSize ? `${Math.max(18, fontSize - 2)}px` : '22px',
     borderRadius: '50%',
     backgroundColor: theme.colors.secondary,
     color: '#ffffff',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: '11px',
+    fontSize: fontSize ? `${Math.max(10, fontSize - 8)}px` : '11px',
     flexShrink: '0',
     marginTop: '3px',
   });
@@ -799,7 +890,7 @@ function renderSimpleBulletLineHTML(bullet: BulletItem, theme: ThemeConfig): str
   });
 
   const titleStyle = toInlineStyle({
-    fontSize: '18px',
+    fontSize: fontSize ? `${fontSize}px` : '18px',
     lineHeight: '1.5',
     color: theme.colors.text,
     margin: '0',
@@ -807,7 +898,7 @@ function renderSimpleBulletLineHTML(bullet: BulletItem, theme: ThemeConfig): str
   });
 
   const descriptionStyle = toInlineStyle({
-    fontSize: '14px',
+    fontSize: fontSize ? `${Math.max(12, fontSize - 4)}px` : '14px',
     lineHeight: '1.6',
     color: theme.colors.textLight,
     margin: '0',

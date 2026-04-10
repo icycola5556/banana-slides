@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__codex__codex",
+      "Bash(python:*)",
+      "Bash(. .venv/Scripts/activate)",
+      "mcp__codex__codex-reply",
+      "Bash(node -e \":*)",
+      "Bash(node:*)",
+      "Bash(npx tsc:*)",
+      "Bash(git add:*)"
+    ]
+  }
+}

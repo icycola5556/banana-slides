@@ -90,10 +90,13 @@ CAPACITY_PROFILES: Dict[str, Dict[str, Dict[str, Any]]] = {
         "b": {"max_items": 3, "max_chars_per_item": 200, "max_total_chars": 800},
     },
     "edu_qa_case": {
-        "a": {"max_items": 4, "max_chars_per_item": 150, "max_total_chars": 600},
-        "b": {"max_items": 5, "max_chars_per_item": 150, "max_total_chars": 800},
-        "c": {"max_items": 4, "max_chars_per_item": 200, "max_total_chars": 800},
-        "d": {"max_items": 3, "max_chars_per_item": 200, "max_total_chars": 800},
+        # Variant A renders max 3 items (see EduQACaseLayout.tsx line 230)
+        "a": {"max_items": 3, "max_chars_per_item": 90, "max_total_chars": 320},
+        # Variant B renders max 4 items (see EduQACaseLayout.tsx line 286)
+        "b": {"max_items": 4, "max_chars_per_item": 90, "max_total_chars": 420},
+        # Note: c/d variants are mapped to a/b in frontend; kept for backward compat
+        "c": {"max_items": 4, "max_chars_per_item": 90, "max_total_chars": 420},
+        "d": {"max_items": 3, "max_chars_per_item": 90, "max_total_chars": 320},
     },
     "title_bullets": {
         "a": {"max_items": 6, "max_chars_per_item": 80, "max_total_chars": 600},
@@ -303,6 +306,11 @@ def _estimate_content_size(page: Dict) -> Dict[str, int]:
         except Exception:
             model = {}
 
+    # For edu_qa_case layout, count structured fields (question, answer, analysis, conclusion)
+    layout_id = page.get("layout_id") or ""
+    if layout_id == "edu_qa_case" or model.get("layout_id") == "edu_qa_case":
+        return _estimate_qa_case_content_size(model)
+
     items = (
         model.get("bullets")
         or model.get("stages")
@@ -327,6 +335,65 @@ def _estimate_content_size(page: Dict) -> Dict[str, int]:
             length = 0
         total_chars += length
         max_item_chars = max(max_item_chars, length)
+
+    return {"item_count": item_count, "total_chars": total_chars, "max_item_chars": max_item_chars}
+
+
+def _estimate_qa_case_content_size(model: Dict) -> Dict[str, int]:
+    """Estimate content size for edu_qa_case layout.
+
+    The frontend renders these as items in order:
+    1. question (Q card)
+    2. answer (A card)
+    3. Each analysis item
+    4. conclusion (if present)
+
+    Variant A renders max 3 items, Variant B renders max 4 items.
+    """
+    total_chars = 0
+    max_item_chars = 0
+    item_count = 0
+
+    # Question field -> becomes Q card
+    question = model.get("question") or ""
+    if question:
+        q_len = len(str(question))
+        total_chars += q_len
+        max_item_chars = max(max_item_chars, q_len)
+        item_count += 1
+
+    # Answer field -> becomes A card
+    answer = model.get("answer") or ""
+    if answer:
+        a_len = len(str(answer))
+        total_chars += a_len
+        max_item_chars = max(max_item_chars, a_len)
+        item_count += 1
+
+    # Analysis items -> each becomes a card
+    analysis = model.get("analysis") or []
+    if isinstance(analysis, list):
+        for entry in analysis:
+            if isinstance(entry, dict):
+                title = entry.get("title") or ""
+                content = entry.get("content") or ""
+                item_text = f"{title}{content}"
+            elif isinstance(entry, str):
+                item_text = entry
+            else:
+                item_text = str(entry)
+            item_len = len(item_text)
+            total_chars += item_len
+            max_item_chars = max(max_item_chars, item_len)
+            item_count += 1
+
+    # Conclusion field -> becomes conclusion card
+    conclusion = model.get("conclusion") or ""
+    if conclusion:
+        c_len = len(str(conclusion))
+        total_chars += c_len
+        max_item_chars = max(max_item_chars, c_len)
+        item_count += 1
 
     return {"item_count": item_count, "total_chars": total_chars, "max_item_chars": max_item_chars}
 

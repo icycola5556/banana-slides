@@ -208,7 +208,7 @@ export const EduQACaseLayout: React.FC<EduQACaseLayoutProps> = ({ model, theme }
         )}
       </div>
 
-      <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', zIndex: 2, minHeight: 0 }}>
+      <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', zIndex: 2, minHeight: 0 }}>
         {isVariantB ? (
           <EduCaseBoard items={data.items} theme={theme} />
         ) : (
@@ -281,78 +281,153 @@ const EduQACards: React.FC<{ items: EduQACaseItem[]; theme: ThemeConfig }> = ({ 
   );
 };
 
-// 变体 B: 非对称极致看板 (比例优化版)
+// 变体 B: 非对称极致看板 (绝对定位布局 - 与HTML导出保持一致)
 const EduCaseBoard: React.FC<{ items: EduQACaseItem[]; theme: ThemeConfig }> = ({ items, theme }) => {
   const layoutItems = items.slice(0, 4);
+  // Check if the 4th card is a true "more/延伸" overflow card
+  const lastItem = layoutItems[layoutItems.length - 1];
+  const hasMoreCard = lastItem && (lastItem.label === '延伸' || lastItem.label_en === 'More');
+
+  if (hasMoreCard) {
+    // 3-row layout with "more" card at bottom
+    const featured = layoutItems[0];
+    const answer = layoutItems[1];
+    const check = layoutItems[2];
+    const more = layoutItems[3];
+
+    return (
+      <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+        {/* Featured (Q) - Left Column */}
+        <div style={{
+          position: 'absolute',
+          left: 0, top: 0, width: '54%', height: '64%',
+          background: 'rgba(15, 23, 42, 0.45)',
+          border: '1px solid rgba(255,255,255,0.06)',
+          borderRadius: 20,
+          padding: '28px 24px',
+          display: 'flex', flexDirection: 'column', gap: 10,
+          boxShadow: SHADOW_SOFT,
+        }}>
+          <div style={{ position: 'absolute', top: 0, left: '15%', right: '15%', height: 1.2, background: `linear-gradient(90deg, transparent, ${featured.color || '#3b82f6'}66, transparent)` }} />
+          <div style={{ fontSize: 12, color: '#64748b', textTransform: 'uppercase', letterSpacing: 3, opacity: 0.7 }}>
+            {(featured as any).label_en ? (featured as any).label_en.toUpperCase() : featured.label.toUpperCase()}
+          </div>
+          <div style={{ fontSize: 24, fontWeight: 800, color: featured.color || '#3b82f6', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ width: 4, height: 18, background: featured.color || '#3b82f6', borderRadius: 2 }} />
+            {featured.label}
+          </div>
+          <div style={{ fontSize: 18, color: '#d1d5db', lineHeight: 1.45, flex: 1, overflow: 'hidden' }}>
+            {highlightText(featured.content, featured.color || '#3b82f6')}
+          </div>
+        </div>
+
+        {/* Answer - Top Right */}
+        <div style={{
+          position: 'absolute',
+          right: 0, top: 0, width: '43%', height: '31%',
+          background: 'rgba(15, 23, 42, 0.65)',
+          border: '1px solid rgba(255,255,255,0.06)',
+          borderRadius: 20,
+          padding: '20px 24px',
+          display: 'flex', flexDirection: 'column', gap: 8,
+          boxShadow: SHADOW_SOFT,
+        }}>
+          <div style={{ fontSize: 12, color: '#64748b', textTransform: 'uppercase', letterSpacing: 3, opacity: 0.7 }}>
+            {(answer as any).label_en ? (answer as any).label_en.toUpperCase() : answer.label.toUpperCase()}
+          </div>
+          <div style={{ fontSize: 20, fontWeight: 800, color: answer.color || '#3b82f6' }}>{answer.label}</div>
+          <div style={{ fontSize: 16, color: '#d1d5db', lineHeight: 1.45, flex: 1, overflow: 'hidden' }}>
+            {highlightText(answer.content, answer.color || '#3b82f6')}
+          </div>
+        </div>
+
+        {/* Check - Bottom Right */}
+        <div style={{
+          position: 'absolute',
+          right: 0, top: '33%', width: '43%', height: '31%',
+          background: 'rgba(15, 23, 42, 0.65)',
+          border: '1px solid rgba(255,255,255,0.06)',
+          borderRadius: 20,
+          padding: '20px 24px',
+          display: 'flex', flexDirection: 'column', gap: 8,
+          boxShadow: SHADOW_SOFT,
+        }}>
+          <div style={{ fontSize: 12, color: '#64748b', textTransform: 'uppercase', letterSpacing: 3, opacity: 0.7 }}>
+            {(check as any).label_en ? (check as any).label_en.toUpperCase() : check.label.toUpperCase()}
+          </div>
+          <div style={{ fontSize: 20, fontWeight: 800, color: check.color || '#3b82f6' }}>{check.label}</div>
+          <div style={{ fontSize: 16, color: '#d1d5db', lineHeight: 1.45, flex: 1, overflow: 'hidden' }}>
+            {highlightText(check.content, check.color || '#3b82f6')}
+          </div>
+        </div>
+
+        {/* More - Bottom Full Width */}
+        <div style={{
+          position: 'absolute',
+          left: 0, bottom: 0, width: '100%', height: '32%',
+          background: 'rgba(15, 23, 42, 0.65)',
+          border: '1px solid rgba(255,255,255,0.06)',
+          borderRadius: 16,
+          padding: '16px 24px',
+          display: 'flex', flexDirection: 'column', gap: 6,
+          boxShadow: SHADOW_SOFT,
+        }}>
+          <div style={{ fontSize: 11, color: '#64748b', textTransform: 'uppercase', letterSpacing: 3, opacity: 0.7 }}>
+            {(more as any).label_en ? (more as any).label_en.toUpperCase() : more.label.toUpperCase()}
+          </div>
+          <div style={{ fontSize: 17, fontWeight: 800, color: more.color || '#3b82f6' }}>{more.label}</div>
+          <div style={{
+            fontSize: 15, color: '#d1d5db', lineHeight: 1.45, flex: 1, overflow: 'hidden',
+            display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical',
+          }}>
+            {highlightText(more.content, more.color || '#3b82f6')}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Standard 2x2 grid using absolute positioning
+  const positions = [
+    { left: '0', top: '0', width: '54%', height: '48%' },    // Featured
+    { right: '0', top: '0', width: '43%', height: '48%' },  // Answer
+    { right: '0', bottom: '0', width: '43%', height: '48%' }, // Check
+    { left: '0', bottom: '0', width: '54%', height: '48%' }   // 4th item
+  ];
+
   return (
-    <div style={{ 
-      display: 'grid', 
-      gridTemplateColumns: '1.25fr 1fr', // 微调比例
-      gridTemplateRows: 'auto auto',
-      gap: 24, // 压缩间距
-      height: '100%',
-      maxHeight: 520, // 限制最大高度
-    }}>
+    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
       {layoutItems.map((item, idx) => {
         const isFeatured = idx === 0;
+        const pos = positions[idx];
+        const color = item.color || '#3b82f6';
+        const padding = isFeatured ? '28px 24px' : '20px 24px';
+        const titleSize = isFeatured ? 24 : 20;
+        const contentSize = isFeatured ? 18 : 16;
+
         return (
-          <div key={idx} style={{
-            gridRow: isFeatured ? 'span 2' : 'auto',
-            background: isFeatured ? 'rgba(15, 23, 42, 0.45)' : 'rgba(15, 23, 42, 0.65)',
-            backdropFilter: 'blur(10px)',
-            WebkitBackdropFilter: 'blur(10px)',
-            border: `1px solid rgba(255,255,255,0.06)`,
-            borderRadius: 24,
-            padding: isFeatured ? '40px 36px' : '24px 32px', // 大幅压缩内边距
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 14,
-            position: 'relative',
-            overflow: 'hidden',
-            boxShadow: SHADOW_SOFT,
-            justifyContent: isFeatured ? 'center' : 'flex-start',
-          }}>
-            <div style={{ position: 'absolute', top: 0, left: '15%', right: '15%', height: 1.2, background: `linear-gradient(90deg, transparent, ${item.color || '#3b82f6'}66, transparent)`, zIndex: 5 }} />
-            <div style={{
+          <div
+            key={idx}
+            style={{
               position: 'absolute',
-              bottom: -30,
-              right: -30,
-              fontSize: 120,
-              opacity: 0.06,
-              color: item.color || '#3b82f6',
-              pointerEvents: 'none',
-              transform: 'rotate(-20deg)',
-              zIndex: 1,
-            }}>
-              {idx === 0 ? '◈' : (idx === 1 ? '✦' : (idx === 2 ? '⦿' : '▣'))}
+              ...pos,
+              background: isFeatured ? 'rgba(15, 23, 42, 0.45)' : 'rgba(15, 23, 42, 0.65)',
+              border: '1px solid rgba(255,255,255,0.06)',
+              borderRadius: 20,
+              padding,
+              display: 'flex', flexDirection: 'column', gap: isFeatured ? 10 : 8,
+              boxShadow: SHADOW_SOFT,
+            }}
+          >
+            <div style={{ fontSize: 12, color: '#64748b', textTransform: 'uppercase', letterSpacing: 3, opacity: 0.7 }}>
+              {(item as any).label_en ? (item as any).label_en.toUpperCase() : item.label.toUpperCase()}
             </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, zIndex: 2 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: 4, opacity: 0.7 }}>
-                {getItemLabelEn(item) || item.label.toUpperCase()}
-              </div>
-              <div style={{
-                fontSize: isFeatured ? 30 : 24, // 压缩标题字号
-                fontWeight: 800,
-                color: item.color || '#3b82f6',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 12,
-                textShadow: `0 0 15px ${(item.color || '#3b82f6')}33`,
-              }}>
-                {idx === 0 && <div style={{ width: 5, height: 26, background: item.color || '#3b82f6', borderRadius: 2 }} />}
-                {item.label}
-              </div>
+            <div style={{ fontSize: titleSize, fontWeight: 800, color, display: isFeatured ? 'flex' : undefined, alignItems: 'center', gap: 8 }}>
+              {isFeatured && <div style={{ width: 4, height: 18, background: color, borderRadius: 2 }} />}
+              {item.label}
             </div>
-
-            <div style={{
-              fontSize: isFeatured ? 24 : 20, // 压缩正文字号
-              color: '#d1d5db',
-              lineHeight: 1.5,
-              fontWeight: 400,
-              zIndex: 2,
-            }}>
-              {highlightText(item.content, item.color || '#3b82f6')}
+            <div style={{ fontSize: contentSize, color: '#d1d5db', lineHeight: 1.45, flex: 1, overflow: 'hidden' }}>
+              {highlightText(item.content, color)}
             </div>
           </div>
         );
@@ -361,48 +436,106 @@ const EduCaseBoard: React.FC<{ items: EduQACaseItem[]; theme: ThemeConfig }> = (
   );
 };
 
-// HTML Renderer 同步修复
+// HTML Renderer - 使用可靠的 Flexbox + 绝对定位布局
 export function renderEduQACaseLayoutHTML(model: EduQACaseModel, theme: ThemeConfig): string {
   const data = normalizeModel(model);
   const isVariantB = data.variant === 'b';
-  
+
   const background = `radial-gradient(circle at 15% 15%, rgba(6,182,212,0.12) 0%, transparent 50%), radial-gradient(circle at 85% 85%, rgba(59,130,246,0.15) 0%, transparent 50%), linear-gradient(135deg, #0b1120 0%, #051937 100%)`;
 
   let contentHTML = '';
   if (isVariantB) {
-    contentHTML = `<div style="display:grid;grid-template-columns:1.25fr 1fr;grid-template-rows:auto auto;gap:24px;height:100%;max-height:520px;">
-      ${data.items.slice(0, 4).map((item, idx) => {
-        const isFeatured = idx === 0;
-        const color = item.color || '#3b82f6';
-        return `
-        <div style="grid-row:${isFeatured ? 'span 2' : 'auto'};background:${isFeatured ? 'rgba(15, 23, 42, 0.45)' : 'rgba(15, 23, 42, 0.65)'};border:1px solid rgba(255,255,255,0.06);border-radius:24px;padding:${isFeatured ? '40px 36px' : '24px 32px'};display:flex;flex-direction:column;gap:14px;position:relative;overflow:hidden;box-shadow:0 16px 40px rgba(0,0,0,0.45);">
-          <div style="position:absolute;top:0;left:15%;right:15%;height:1.2px;background:linear-gradient(90deg,transparent,${color}66,transparent);z-index:5;"></div>
-          <div style="position:absolute;bottom:-30px;right:-30px;font-size:120px;opacity:0.06;color:${color};transform:rotate(-20deg);z-index:1;">${idx === 0 ? '◈' : (idx === 1 ? '✦' : '⦿')}</div>
-          <div style="z-index:2;display:flex;flex-direction:column;gap:4px;">
-            <div style="font-size:13px;color:#64748b;text-transform:uppercase;letter-spacing:4px;opacity:0.7;">${item.label.toUpperCase()}</div>
-            <div style="font-size:${isFeatured ? '30px' : '24px'};font-weight:800;color:${color};display:flex;align-items:center;gap:12px;">
-              ${isFeatured ? `<div style="width:5px;height:26px;background:${color};border-radius:2px;"></div>` : ''}
+    const items = data.items.slice(0, 4);
+    // Check if the 4th card is a true "more/延伸" overflow card
+    const lastItem = items[items.length - 1];
+    const hasMoreCard = lastItem && (lastItem.label === '延伸' || lastItem.label_en === 'More');
+
+    if (hasMoreCard) {
+      // 3-row layout: Q+A+check in 2x2 grid, "more" card at bottom full width
+      const featured = items[0];
+      const answer = items[1];
+      const check = items[2];
+      const more = items[3];
+
+      contentHTML = `
+      <div style="position:relative;width:100%;height:100%;">
+        <!-- Featured (Q) - Left Column -->
+        <div style="position:absolute;left:0;top:0;width:54%;height:64%;background:rgba(15, 23, 42, 0.45);border:1px solid rgba(255,255,255,0.06);border-radius:20px;padding:28px 24px;display:flex;flex-direction:column;gap:10px;box-shadow:0 16px 40px rgba(0,0,0,0.45);">
+          <div style="position:absolute;top:0;left:15%;right:15%;height:1.2px;background:linear-gradient(90deg,transparent,${featured.color || '#3b82f6'}66,transparent);"></div>
+          <div style="font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:3px;opacity:0.7;">${featured.label.toUpperCase()}</div>
+          <div style="font-size:24px;font-weight:800;color:${featured.color || '#3b82f6'};display:flex;align-items:center;gap:8px;">
+            <div style="width:4px;height:18px;background:${featured.color || '#3b82f6'};border-radius:2px;"></div>
+            ${featured.label}
+          </div>
+          <div style="font-size:18px;color:#d1d5db;line-height:1.45;flex:1;overflow:hidden;">${featured.content}</div>
+        </div>
+
+        <!-- Answer - Top Right -->
+        <div style="position:absolute;right:0;top:0;width:43%;height:31%;background:rgba(15, 23, 42, 0.65);border:1px solid rgba(255,255,255,0.06);border-radius:20px;padding:20px 24px;display:flex;flex-direction:column;gap:8px;box-shadow:0 16px 40px rgba(0,0,0,0.45);">
+          <div style="font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:3px;opacity:0.7;">${answer.label.toUpperCase()}</div>
+          <div style="font-size:20px;font-weight:800;color:${answer.color || '#3b82f6'};">${answer.label}</div>
+          <div style="font-size:16px;color:#d1d5db;line-height:1.45;flex:1;overflow:hidden;">${answer.content}</div>
+        </div>
+
+        <!-- Check - Bottom Right -->
+        <div style="position:absolute;right:0;top:33%;width:43%;height:31%;background:rgba(15, 23, 42, 0.65);border:1px solid rgba(255,255,255,0.06);border-radius:20px;padding:20px 24px;display:flex;flex-direction:column;gap:8px;box-shadow:0 16px 40px rgba(0,0,0,0.45);">
+          <div style="font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:3px;opacity:0.7;">${check.label.toUpperCase()}</div>
+          <div style="font-size:20px;font-weight:800;color:${check.color || '#3b82f6'};">${check.label}</div>
+          <div style="font-size:16px;color:#d1d5db;line-height:1.45;flex:1;overflow:hidden;">${check.content}</div>
+        </div>
+
+        <!-- More - Bottom Full Width -->
+        <div style="position:absolute;left:0;bottom:0;width:100%;height:32%;background:rgba(15, 23, 42, 0.65);border:1px solid rgba(255,255,255,0.06);border-radius:16px;padding:16px 24px;display:flex;flex-direction:column;gap:6px;box-shadow:0 16px 40px rgba(0,0,0,0.45);">
+          <div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:3px;opacity:0.7;">${more.label.toUpperCase()}</div>
+          <div style="font-size:17px;font-weight:800;color:${more.color || '#3b82f6'};">${more.label}</div>
+          <div style="font-size:15px;color:#d1d5db;line-height:1.45;flex:1;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;">${more.content}</div>
+        </div>
+      </div>`;
+    } else {
+      // Standard 2x2 grid using absolute positioning for reliability
+      const positions = [
+        { left: '0', top: '0', width: '54%', height: '48%' },    // Featured
+        { right: '0', top: '0', width: '43%', height: '48%' },  // Answer
+        { right: '0', bottom: '0', width: '43%', height: '48%' }, // Check
+        { left: '0', bottom: '0', width: '54%', height: '48%' }  // 4th item
+      ];
+
+      contentHTML = `<div style="position:relative;width:100%;height:100%;">` +
+        items.map((item, idx) => {
+          const isFeatured = idx === 0;
+          const pos = positions[idx];
+          const color = item.color || '#3b82f6';
+          const padding = isFeatured ? '28px 24px' : '20px 24px';
+          const titleSize = isFeatured ? '24px' : '20px';
+          const contentSize = isFeatured ? '18px' : '16px';
+
+          return `
+          <div style="position:absolute;${Object.entries(pos).map(([k,v]) => `${k}:${v};`).join('')}background:${isFeatured ? 'rgba(15, 23, 42, 0.45)' : 'rgba(15, 23, 42, 0.65)'};border:1px solid rgba(255,255,255,0.06);border-radius:20px;padding:${padding};display:flex;flex-direction:column;gap:${isFeatured ? '10px' : '8px'};box-shadow:0 16px 40px rgba(0,0,0,0.45);">
+            <div style="font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:3px;opacity:0.7;">${item.label.toUpperCase()}</div>
+            <div style="font-size:${titleSize};font-weight:800;color:${color};${isFeatured ? 'display:flex;align-items:center;gap:8px;' : ''}">
+              ${isFeatured ? `<div style="width:4px;height:18px;background:${color};border-radius:2px;"></div>` : ''}
               ${item.label}
             </div>
-          </div>
-          <div style="font-size:${isFeatured ? '24px' : '20px'};color:#d1d5db;line-height:1.5;z-index:2;">${item.content}</div>
-        </div>`;
-      }).join('')}
-    </div>`;
+            <div style="font-size:${contentSize};color:#d1d5db;line-height:1.45;flex:1;overflow:hidden;">${item.content}</div>
+          </div>`;
+        }).join('') +
+      `</div>`;
+    }
   } else {
-    contentHTML = `<div style="position:relative;max-width:1040px;margin:0 auto;width:100%;">
+    // Variant A - Q&A Cards layout
+    contentHTML = `<div style="position:relative;max-width:1040px;margin:0 auto;width:100%;height:100%;">
       <div style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:1;">
         <svg width="1040" height="400" viewBox="0 0 1040 400" fill="none"><path d="M 250 120 Q 520 250 790 380" stroke="white" stroke-opacity="0.08" stroke-width="1" stroke-dasharray="4 6" /></svg>
       </div>
-      <div style="display:flex;flex-direction:column;gap:40px;z-index:5;position:relative;">
+      <div style="display:flex;flex-direction:column;gap:32px;z-index:5;position:relative;height:100%;justify-content:center;">
       ${data.items.slice(0, 3).map((item, idx) => {
         const isQuestion = item.label.toUpperCase() === 'Q' || item.label.includes('问');
         const color = item.color || (isQuestion ? '#06b6d3' : '#10b981');
         return `
-          <div style="align-self:${isQuestion ? 'flex-start' : 'flex-end'};margin-left:${isQuestion ? '-40px' : '0'};margin-right:${isQuestion ? '0' : '-40px'};max-width:${isQuestion ? '70%' : '80%'};position:relative;">
+          <div style="align-self:${isQuestion ? 'flex-start' : 'flex-end'};margin-left:${isQuestion ? '-20px' : '0'};margin-right:${isQuestion ? '0' : '-20px'};max-width:${isQuestion ? '70%' : '80%'};position:relative;">
             <div style="position:absolute;top:0;left:10%;right:10%;height:1.2px;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.3),transparent);z-index:11;"></div>
-            <div style="position:absolute;top:-20px;${isQuestion ? 'left' : 'right'}:-20px;width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg, ${color}, #051937);display:flex;align-items:center;justify-content:center;color:#fff;font-size:20px;font-weight:900;z-index:12;box-shadow:0 4px 12px rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.3);">${item.label[0]}</div>
-            <div style="background:${isQuestion ? 'rgba(30, 41, 59, 0.5)' : 'rgba(6, 182, 211, 0.12)'};backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid ${isQuestion ? 'rgba(255,255,255,0.1)' : 'rgba(6, 182, 211, 0.25)'};box-shadow:0 16px 40px rgba(0,0,0,0.45);border-radius:24px;padding:24px 32px;color:${isQuestion ? '#cbd5e1' : '#ffffff'};font-size:24px;line-height:1.5;">${item.content}</div>
+            <div style="position:absolute;top:-16px;${isQuestion ? 'left' : 'right'}:-16px;width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg, ${color}, #051937);display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;font-weight:900;z-index:12;box-shadow:0 4px 12px rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.3);">${item.label[0]}</div>
+            <div style="background:${isQuestion ? 'rgba(30, 41, 59, 0.5)' : 'rgba(6, 182, 211, 0.12)'};backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid ${isQuestion ? 'rgba(255,255,255,0.1)' : 'rgba(6, 182, 211, 0.25)'};box-shadow:0 16px 40px rgba(0,0,0,0.45);border-radius:20px;padding:20px 28px;color:${isQuestion ? '#cbd5e1' : '#ffffff'};font-size:20px;line-height:1.5;overflow:hidden;">${item.content}</div>
           </div>`;
       }).join('')}
       </div>
@@ -420,7 +553,7 @@ export function renderEduQACaseLayoutHTML(model: EduQACaseModel, theme: ThemeCon
     </div>
     ${data.subtitle ? `<div style="color:#93c5fd;font-size:18px;letter-spacing:3px;text-transform:uppercase;opacity:0.7;">${data.subtitle}</div>` : ''}
   </div>
-  <div style="flex-grow:1;display:flex;flex-direction:column;justify-content:center;min-height:0;">
+  <div style="flex-grow:1;display:flex;flex-direction:column;justify-content:flex-start;min-height:0;">
     ${contentHTML}
   </div>
 </section>`;
