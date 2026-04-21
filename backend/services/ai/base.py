@@ -1,4 +1,4 @@
-"""
+﻿"""
 AI Base - Core AI capabilities and JSON parsing utilities.
 
 Extracted from ai_service.py lines 1-399.
@@ -26,13 +26,13 @@ logger = logging.getLogger(__name__)
 
 
 class ProjectContext:
-    """项目上下文数据类，统一管理 AI 需要的所有项目信息"""
+    """椤圭洰涓婁笅鏂囨暟鎹被锛岀粺涓€绠＄悊 AI 闇€瑕佺殑鎵€鏈夐」鐩俊鎭?"""
 
     def __init__(self, project_or_dict, reference_files_content: Optional[List[Dict[str, str]]] = None):
         """
         Args:
-            project_or_dict: 项目对象（Project model）或项目字典（project.to_dict()）
-            reference_files_content: 参考文件内容列表
+            project_or_dict: 椤圭洰瀵硅薄锛圥roject model锛夋垨椤圭洰瀛楀吀锛坧roject.to_dict()锛?
+            reference_files_content: 鍙傝€冩枃浠跺唴瀹瑰垪琛?
         """
         if hasattr(project_or_dict, 'idea_prompt'):
             self.idea_prompt = project_or_dict.idea_prompt
@@ -100,7 +100,7 @@ class AIBase:
             return await method(*args, **kwargs)
         return await asyncio.to_thread(method, *args, **kwargs)
 
-    # ── JSON Parsing Utilities ───────────────────────────────────
+    # 鈹€鈹€ JSON Parsing Utilities 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
     @staticmethod
     def _strip_markdown_json_fence(text: str) -> str:
@@ -183,7 +183,7 @@ class AIBase:
             candidates.append(brace_fixed)
         return candidates
 
-    # ── JSON Generation (with retry) ────────────────────────────
+    # 鈹€鈹€ JSON Generation (with retry) 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
     @retry(
         stop=stop_after_attempt(3),
@@ -202,7 +202,7 @@ class AIBase:
             except json.JSONDecodeError as e:
                 last_err = e
 
-        logger.warning(f"JSON解析失败，将重新生成。原始文本: {cleaned_text[:200]}... 错误: {str(last_err)}")
+        logger.warning(f"JSON瑙ｆ瀽澶辫触锛屽皢閲嶆柊鐢熸垚銆傚師濮嬫枃鏈? {cleaned_text[:200]}... 閿欒: {str(last_err)}")
         raise last_err
 
     @retry(
@@ -225,7 +225,7 @@ class AIBase:
             except json.JSONDecodeError as e:
                 last_err = e
 
-        logger.warning(f"JSON解析失败，将重新生成。原始文本: {cleaned_text[:200]}... 错误: {str(last_err)}")
+        logger.warning(f"JSON瑙ｆ瀽澶辫触锛屽皢閲嶆柊鐢熸垚銆傚師濮嬫枃鏈? {cleaned_text[:200]}... 閿欒: {str(last_err)}")
         raise last_err
 
     @retry(
@@ -244,7 +244,7 @@ class AIBase:
                 prompt=prompt, images=[image_path], thinking_budget=thinking_budget
             )
         else:
-            raise ValueError("text_provider 不支持图片输入")
+            raise ValueError("text_provider 涓嶆敮鎸佸浘鐗囪緭鍏?")
 
         cleaned_text = self._normalize_json_text_for_parse(response_text)
 
@@ -255,7 +255,7 @@ class AIBase:
             except json.JSONDecodeError as e:
                 last_err = e
 
-        logger.warning(f"JSON解析失败（带图片），将重新生成。原始文本: {cleaned_text[:200]}... 错误: {str(last_err)}")
+        logger.warning(f"JSON瑙ｆ瀽澶辫触锛堝甫鍥剧墖锛夛紝灏嗛噸鏂扮敓鎴愩€傚師濮嬫枃鏈? {cleaned_text[:200]}... 閿欒: {str(last_err)}")
         raise last_err
 
     @retry(
@@ -274,7 +274,7 @@ class AIBase:
                 prompt=prompt, images=[image_path], thinking_budget=thinking_budget
             )
         else:
-            raise ValueError("text_provider 不支持图片输入")
+            raise ValueError("text_provider 涓嶆敮鎸佸浘鐗囪緭鍏?")
 
         cleaned_text = self._normalize_json_text_for_parse(response_text)
 
@@ -285,10 +285,10 @@ class AIBase:
             except json.JSONDecodeError as e:
                 last_err = e
 
-        logger.warning(f"JSON解析失败（带图片），将重新生成。原始文本: {cleaned_text[:200]}... 错误: {str(last_err)}")
+        logger.warning(f"JSON瑙ｆ瀽澶辫触锛堝甫鍥剧墖锛夛紝灏嗛噸鏂扮敓鎴愩€傚師濮嬫枃鏈? {cleaned_text[:200]}... 閿欒: {str(last_err)}")
         raise last_err
 
-    # ── Image & Markdown Helpers ────────────────────────────────
+    # 鈹€鈹€ Image & Markdown Helpers 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
     @staticmethod
     def _convert_mineru_path_to_local(mineru_path: str) -> Optional[str]:
