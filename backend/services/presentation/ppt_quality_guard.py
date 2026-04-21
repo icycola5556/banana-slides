@@ -156,6 +156,8 @@ def apply_structured_outline_quality_guard(
     toc_id = roles.get("toc", "toc")
     ending_id = roles.get("ending", "ending")
 
+    _normalize_structured_toc_pages(guarded_pages, scheme_id)
+
     for idx, page in enumerate(guarded_pages, 1):
         page["page_id"] = f"p{idx:02d}"
 
@@ -538,6 +540,60 @@ def _pick_scheme_layout(base_layout: str, scheme_id: str) -> str:
 
     fallback = [lid for lid in layouts if lid not in reserved]
     return fallback[0] if fallback else layouts[0]
+
+
+def _is_scheme_toc_page(page: Dict[str, Any], scheme_id: str) -> bool:
+    if not isinstance(page, dict):
+        return False
+
+    roles = SCHEME_ROLE_LAYOUTS.get(scheme_id or "tech_blue", SCHEME_ROLE_LAYOUTS["tech_blue"])
+    toc_id = _clean_short(roles.get("toc", "toc")).lower()
+    raw_layout_id = _clean_short(page.get("layout_id")).lower()
+    resolved_layout_id = _resolve_layout_id(page.get("layout_id")).lower()
+
+    return raw_layout_id == toc_id or resolved_layout_id == "toc"
+
+
+def _replacement_layout_for_duplicate_toc(page: Dict[str, Any], scheme_id: str) -> str:
+    title = _clean_short(page.get("title"))
+    points = page.get("points") if isinstance(page.get("points"), list) else []
+    page_text = f"{title} {' '.join(str(point) for point in points)}"
+
+    base_layout = _infer_base_layout_for_topic(page_text)
+    if base_layout == "title_content" and (
+        len(points) >= 4 or _contains_any(page_text, _OVERVIEW_KEYWORDS)
+    ):
+        base_layout = "title_bullets"
+
+    return _pick_scheme_layout(base_layout, scheme_id)
+
+
+def _normalize_structured_toc_pages(pages: List[Dict[str, Any]], scheme_id: str) -> None:
+    if len(pages) < 2:
+        return
+
+    first_toc_index = next(
+        (
+            idx
+            for idx, page in enumerate(pages)
+            if _is_scheme_toc_page(page, scheme_id)
+        ),
+        None,
+    )
+
+    if first_toc_index is not None and first_toc_index > 1:
+        pages[1], pages[first_toc_index] = pages[first_toc_index], pages[1]
+
+    last_index = len(pages) - 1
+    for idx, page in enumerate(pages):
+        if idx in {0, 1, last_index}:
+            continue
+        if not _is_scheme_toc_page(page, scheme_id):
+            continue
+
+        page["layout_id"] = _replacement_layout_for_duplicate_toc(page, scheme_id)
+        page["has_image"] = False
+        page["keywords"] = _safe_keywords(page.get("keywords", []))
 
 
 def _safe_keywords(keywords: Any) -> List[str]:

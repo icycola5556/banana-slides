@@ -3,6 +3,7 @@ import type {
   LayoutModel,
   PagePayload,
 } from '@/experimental/html-renderer/types/schema';
+import { getPreviewLayoutIds } from '@/data/layoutSchemeManifest';
 
 export interface LayoutSchemePreviewPage {
   id: string;
@@ -36,6 +37,57 @@ const buildPages = (schemeId: string, seeds: PreviewSeed[]): LayoutSchemePreview
       model: seed.model,
     },
   }));
+
+const normalizePreviewPages = (
+  schemeId: string,
+  pages: LayoutSchemePreviewPage[]
+): LayoutSchemePreviewPage[] => {
+  const schemeSlug = schemeId.replace(/_/g, '-');
+
+  return pages.map((page, index) => ({
+    ...page,
+    id: `${schemeSlug}-${index + 1}`,
+    page: {
+      ...page.page,
+      page_id: `scheme-preview-${schemeSlug}-${index + 1}`,
+      order_index: index,
+    },
+  }));
+};
+
+const applyManifestPreviewOrder = (
+  schemeId: string,
+  preview: LayoutSchemePreview
+): LayoutSchemePreview => {
+  const expectedLayoutIds = getPreviewLayoutIds(schemeId);
+  const previewPagesByLayoutId = new Map(
+    preview.pages.map((page) => [String(page.page.layout_id), page])
+  );
+  const unexpectedLayoutIds = preview.pages
+    .map((page) => String(page.page.layout_id))
+    .filter((layoutId) => !expectedLayoutIds.includes(layoutId));
+
+  if (unexpectedLayoutIds.length > 0) {
+    throw new Error(
+      `Unexpected preview layout ids for ${schemeId}: ${unexpectedLayoutIds.join(', ')}`
+    );
+  }
+
+  const orderedPages = expectedLayoutIds.map((layoutId) => {
+    const page = previewPagesByLayoutId.get(layoutId);
+
+    if (!page) {
+      throw new Error(`Missing preview seed for ${schemeId}: ${layoutId}`);
+    }
+
+    return page;
+  });
+
+  return {
+    ...preview,
+    pages: normalizePreviewPages(schemeId, orderedPages),
+  };
+};
 
 const createPreviewArtwork = (
   title: string,
@@ -80,7 +132,7 @@ const artwork = {
   modernPulse: createPreviewArtwork('先锋提案', 'Asymmetry / Motion / Brand Signal', ['#0f0f14', '#1d1742', '#3d1f14'], '#fb923c'),
 };
 
-export const layoutSchemePreviews: Record<string, LayoutSchemePreview> = {
+const rawLayoutSchemePreviews: Record<string, LayoutSchemePreview> = {
   edu_dark: {
     label: '完整故事板预览',
     description: '按课程发布到复盘收束的顺序展开，展示深色教育系列的全部核心布局。',
@@ -1782,3 +1834,10 @@ export const layoutSchemePreviews: Record<string, LayoutSchemePreview> = {
     ]),
   },
 };
+
+export const layoutSchemePreviews: Record<string, LayoutSchemePreview> = Object.fromEntries(
+  Object.entries(rawLayoutSchemePreviews).map(([schemeId, preview]) => [
+    schemeId,
+    applyManifestPreviewOrder(schemeId, preview),
+  ])
+) as Record<string, LayoutSchemePreview>;

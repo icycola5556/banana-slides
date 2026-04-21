@@ -1,6 +1,7 @@
 """Generated modular prompt file for layouts."""
 from typing import List, Dict, Optional, Any
 import json
+from pathlib import Path
 from textwrap import dedent
 
 LAYOUT_DESCRIPTIONS = {'cover': '封面页 - 第一页必须用这个，展示标题、副标题、作者等',
@@ -213,6 +214,112 @@ SCHEME_ROLE_LAYOUTS = {'academic': {'cover': 'cover_academic', 'ending': 'ending
  'business_pro': {'cover': 'cover', 'ending': 'edu_summary', 'toc': 'timeline'},
  'minimal_clean': {'cover': 'cover', 'ending': 'ending', 'toc': 'section_title'},
  'warm_edu': {'cover': 'cover', 'ending': 'ending', 'toc': 'learning_objectives'}}
+
+
+_LAYOUT_SCHEME_MANIFEST_PATH = (
+    Path(__file__).resolve().parents[3] / 'frontend' / 'src' / 'data' / 'layoutSchemeManifest.json'
+)
+
+
+def _load_layout_scheme_manifest() -> Dict[str, Dict[str, Any]]:
+    with _LAYOUT_SCHEME_MANIFEST_PATH.open('r', encoding='utf-8') as handle:
+        manifest = json.load(handle)
+
+    if not isinstance(manifest, dict):
+        raise ValueError('layout scheme manifest must be a JSON object')
+
+    return manifest
+
+
+def _build_layout_schemes_from_manifest(
+    raw_layout_schemes: Dict[str, Dict[str, Any]],
+    manifest: Dict[str, Dict[str, Any]],
+) -> Dict[str, Dict[str, Any]]:
+    unexpected_scheme_ids = sorted(set(manifest) - set(raw_layout_schemes))
+    if unexpected_scheme_ids:
+        raise KeyError(
+            f'layout scheme manifest contains unknown scheme ids: {", ".join(unexpected_scheme_ids)}'
+        )
+
+    layout_schemes: Dict[str, Dict[str, Any]] = {}
+
+    for scheme_id, raw_scheme in raw_layout_schemes.items():
+        manifest_scheme = manifest.get(scheme_id)
+        if not manifest_scheme:
+            layout_schemes[scheme_id] = raw_scheme
+            continue
+
+        layout_descriptions = raw_scheme.get('layouts', {})
+        canonical_layout_ids = manifest_scheme.get('canonical_layout_ids') or list(
+            layout_descriptions.keys()
+        )
+        missing_layout_ids = [
+            layout_id for layout_id in canonical_layout_ids if layout_id not in layout_descriptions
+        ]
+        if missing_layout_ids:
+            raise KeyError(
+                f'{scheme_id} manifest references unknown canonical layout ids: '
+                f'{", ".join(missing_layout_ids)}'
+            )
+
+        layout_schemes[scheme_id] = {
+            **raw_scheme,
+            'layouts': {
+                layout_id: layout_descriptions[layout_id] for layout_id in canonical_layout_ids
+            },
+        }
+
+    return layout_schemes
+
+
+def _build_scheme_role_layouts_from_manifest(
+    raw_scheme_role_layouts: Dict[str, Dict[str, str]],
+    manifest: Dict[str, Dict[str, Any]],
+) -> Dict[str, Dict[str, str]]:
+    scheme_role_layouts: Dict[str, Dict[str, str]] = {}
+
+    for scheme_id, raw_roles in raw_scheme_role_layouts.items():
+        manifest_scheme = manifest.get(scheme_id)
+        if not manifest_scheme:
+            scheme_role_layouts[scheme_id] = raw_roles
+            continue
+
+        canonical_layout_ids = set(manifest_scheme.get('canonical_layout_ids') or [])
+        manifest_roles = manifest_scheme.get('role_layouts') or {}
+        missing_roles = [role for role in ('cover', 'toc', 'ending') if role not in manifest_roles]
+        if missing_roles:
+            raise KeyError(
+                f'{scheme_id} manifest is missing role layouts for: {", ".join(missing_roles)}'
+            )
+
+        invalid_role_layouts = {
+            role: layout_id
+            for role, layout_id in manifest_roles.items()
+            if layout_id not in canonical_layout_ids
+        }
+        if invalid_role_layouts:
+            invalid_pairs = ', '.join(
+                f'{role}={layout_id}' for role, layout_id in invalid_role_layouts.items()
+            )
+            raise KeyError(
+                f'{scheme_id} manifest role layouts must reference canonical ids: {invalid_pairs}'
+            )
+
+        scheme_role_layouts[scheme_id] = {
+            'cover': manifest_roles['cover'],
+            'toc': manifest_roles['toc'],
+            'ending': manifest_roles['ending'],
+        }
+
+    return scheme_role_layouts
+
+
+LAYOUT_SCHEME_MANIFEST = _load_layout_scheme_manifest()
+LAYOUT_SCHEMES = _build_layout_schemes_from_manifest(LAYOUT_SCHEMES, LAYOUT_SCHEME_MANIFEST)
+SCHEME_ROLE_LAYOUTS = _build_scheme_role_layouts_from_manifest(
+    SCHEME_ROLE_LAYOUTS,
+    LAYOUT_SCHEME_MANIFEST,
+)
 
 
 LAYOUT_ID_ALIASES = {

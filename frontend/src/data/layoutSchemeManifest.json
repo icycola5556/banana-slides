@@ -1,0 +1,324 @@
+{
+  "edu_dark": {
+    "canonical_layout_ids": [
+      "edu_core_hub",
+      "edu_cover",
+      "edu_data_board",
+      "edu_logic_flow",
+      "edu_summary",
+      "edu_timeline_steps",
+      "edu_toc",
+      "edu_qa_case",
+      "edu_tri_compare"
+    ],
+    "preview_layout_ids": [
+      "edu_cover",
+      "edu_toc",
+      "edu_tri_compare",
+      "edu_core_hub",
+      "edu_timeline_steps",
+      "edu_logic_flow",
+      "edu_data_board",
+      "edu_qa_case",
+      "edu_summary"
+    ],
+    "role_layouts": {
+      "cover": "edu_cover",
+      "toc": "edu_toc",
+      "ending": "edu_summary"
+    }
+  },
+  "tech_blue": {
+    "canonical_layout_ids": [
+      "arch_blocks",
+      "cover_tech",
+      "ending_tech",
+      "flow_logic_sequence",
+      "param_dashboard",
+      "protocol_analysis",
+      "requirement_specs",
+      "system_comparison",
+      "tech_principle",
+      "toc_tech"
+    ],
+    "preview_layout_ids": [
+      "cover_tech",
+      "toc_tech",
+      "arch_blocks",
+      "flow_logic_sequence",
+      "param_dashboard",
+      "protocol_analysis",
+      "requirement_specs",
+      "system_comparison",
+      "tech_principle",
+      "ending_tech"
+    ],
+    "role_layouts": {
+      "cover": "cover_tech",
+      "toc": "toc_tech",
+      "ending": "ending_tech"
+    }
+  },
+  "academic": {
+    "canonical_layout_ids": [
+      "academic_narrative",
+      "academic_practice",
+      "case_study",
+      "comparison_table",
+      "cover_academic",
+      "diagram_illustration",
+      "ending_academic",
+      "key_concepts",
+      "key_takeaways",
+      "learning_objectives",
+      "theory_explanation",
+      "toc_academic"
+    ],
+    "preview_layout_ids": [
+      "cover_academic",
+      "toc_academic",
+      "learning_objectives",
+      "key_concepts",
+      "theory_explanation",
+      "academic_narrative",
+      "case_study",
+      "comparison_table",
+      "diagram_illustration",
+      "key_takeaways",
+      "academic_practice",
+      "ending_academic"
+    ],
+    "role_layouts": {
+      "cover": "cover_academic",
+      "toc": "toc_academic",
+      "ending": "ending_academic"
+    }
+  },
+  "interactive": {
+    "canonical_layout_ids": [
+      "agenda_path",
+      "case_discussion",
+      "cover_interactive",
+      "ending_interactive",
+      "feedback_poll",
+      "group_collab",
+      "mind_map_structure",
+      "quiz_interaction",
+      "role_play_scenario",
+      "warmup_inquiry"
+    ],
+    "preview_layout_ids": [
+      "cover_interactive",
+      "agenda_path",
+      "warmup_inquiry",
+      "feedback_poll",
+      "case_discussion",
+      "group_collab",
+      "mind_map_structure",
+      "quiz_interaction",
+      "role_play_scenario",
+      "ending_interactive"
+    ],
+    "role_layouts": {
+      "cover": "cover_interactive",
+      "toc": "agenda_path",
+      "ending": "ending_interactive"
+    }
+  },
+  "visual": {
+    "canonical_layout_ids": [
+      "case_before_after",
+      "cover_field",
+      "ending_field",
+      "field_observation",
+      "gallery_professional",
+      "infographic_flow",
+      "portfolio_industry",
+      "site_survey",
+      "specimen_detail",
+      "timeline_evolution"
+    ],
+    "preview_layout_ids": [
+      "cover_field",
+      "timeline_evolution",
+      "field_observation",
+      "gallery_professional",
+      "case_before_after",
+      "infographic_flow",
+      "site_survey",
+      "specimen_detail",
+      "portfolio_industry",
+      "ending_field"
+    ],
+    "role_layouts": {
+      "cover": "cover_field",
+      "toc": "timeline_evolution",
+      "ending": "ending_field"
+    }
+  },
+  "practical": {
+    "canonical_layout_ids": [
+      "checklist_verification",
+      "common_faults",
+      "cover_practical",
+      "detail_specs",
+      "ending_practical",
+      "equipment_orientation",
+      "safety_protocol",
+      "sop_vertical_steps",
+      "task_instruction",
+      "technical_tip"
+    ],
+    "preview_layout_ids": [
+      "cover_practical",
+      "checklist_verification",
+      "safety_protocol",
+      "equipment_orientation",
+      "sop_vertical_steps",
+      "task_instruction",
+      "common_faults",
+      "technical_tip",
+      "detail_specs",
+      "ending_practical"
+    ],
+    "role_layouts": {
+      "cover": "cover_practical",
+      "toc": "checklist_verification",
+      "ending": "ending_practical"
+    }
+  },
+  "modern": {
+    "canonical_layout_ids": [
+      "business_canvas",
+      "comparison_matrix",
+      "cover_modern",
+      "ending_modern",
+      "legal_regulation",
+      "org_structure_flow",
+      "process_sop_standard",
+      "stat_report",
+      "strategic_pillars",
+      "toc_modern"
+    ],
+    "preview_layout_ids": [
+      "cinematic_overlay",
+      "overlap",
+      "sidebar_card",
+      "concentric_focus",
+      "flow_process",
+      "grid_matrix",
+      "diagonal_split",
+      "tri_column",
+      "dark_math",
+      "vertical_timeline"
+    ],
+    "role_layouts": {
+      "cover": "cover_modern",
+      "toc": "toc_modern",
+      "ending": "ending_modern"
+    }
+  },
+  "minimal_clean": {
+    "canonical_layout_ids": [
+      "cover",
+      "quote",
+      "detail_zoom",
+      "title_content",
+      "section_title",
+      "two_column",
+      "timeline",
+      "portfolio",
+      "title_bullets",
+      "edu_tri_compare",
+      "ending"
+    ],
+    "preview_layout_ids": [
+      "blueprint_cover",
+      "blueprint_quote",
+      "blueprint_toc",
+      "blueprint_spec_card",
+      "blueprint_annotation",
+      "blueprint_section_title",
+      "blueprint_dual_panel",
+      "blueprint_timeline",
+      "blueprint_bento_grid",
+      "blueprint_tri_compare",
+      "blueprint_gallery",
+      "blueprint_big_reveal",
+      "blueprint_closing"
+    ],
+    "role_layouts": {
+      "cover": "cover",
+      "toc": "section_title",
+      "ending": "ending"
+    }
+  },
+  "warm_edu": {
+    "canonical_layout_ids": [
+      "cover",
+      "learning_objectives",
+      "warmup_question",
+      "image_full",
+      "vocational_bullets",
+      "vocational_content",
+      "vocational_comparison",
+      "title_bullets",
+      "quiz",
+      "edu_summary",
+      "ending"
+    ],
+    "preview_layout_ids": [
+      "vocational_intro_cover",
+      "vocational_mission_toc",
+      "vocational_target_lock",
+      "vocational_safety_check",
+      "vocational_equipment_grid",
+      "vocational_blueprint_zoom",
+      "vocational_sop_banner",
+      "vocational_warning_split",
+      "vocational_piv_hud",
+      "vocational_fault_diagnostic",
+      "vocational_practice_sandbox",
+      "vocational_mission_complete"
+    ],
+    "role_layouts": {
+      "cover": "cover",
+      "toc": "learning_objectives",
+      "ending": "ending"
+    }
+  },
+  "business_pro": {
+    "canonical_layout_ids": [
+      "cover",
+      "edu_data_board",
+      "timeline",
+      "edu_core_hub",
+      "comparison_table",
+      "two_column",
+      "process_steps",
+      "image_full",
+      "detail_zoom",
+      "safety_notice",
+      "edu_summary"
+    ],
+    "preview_layout_ids": [
+      "vault_cover",
+      "vault_index",
+      "vault_kpi_grid",
+      "vault_heatmap",
+      "vault_timeline",
+      "vault_split_brief",
+      "vault_flow_circuit",
+      "vault_dashboard",
+      "vault_deep_analysis",
+      "vault_terminal",
+      "vault_compare",
+      "vault_debrief"
+    ],
+    "role_layouts": {
+      "cover": "cover",
+      "toc": "timeline",
+      "ending": "edu_summary"
+    }
+  }
+}

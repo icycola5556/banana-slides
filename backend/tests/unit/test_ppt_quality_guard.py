@@ -3,6 +3,7 @@
 from services.presentation.ppt_quality_guard import (
     apply_outline_quality_guard,
     apply_page_model_quality_guard,
+    apply_structured_outline_quality_guard,
 )
 
 
@@ -139,3 +140,37 @@ def test_outline_guard_preserves_part_structure_when_input_uses_parts():
     guarded = apply_outline_quality_guard(outline, render_mode="html", scheme_id="tech_blue")
     assert isinstance(guarded, list)
     assert any(isinstance(item, dict) and "part" in item for item in guarded)
+
+
+def test_structured_outline_guard_keeps_only_one_modern_toc_page():
+    outline_doc = {
+        "title": "生成一份关于3D建模入门教程的PPT",
+        "pages": [
+            {"title": "3D建模入门：从零基础到商业实战", "layout_id": "cover_modern", "points": []},
+            {
+                "title": "主流软件生态对比与选型策略",
+                "layout_id": "comparison_matrix",
+                "points": ["专业级工作流", "行业适配场景", "学习成本与团队协作"],
+            },
+            {
+                "title": "目录导航",
+                "layout_id": "toc_modern",
+                "points": ["行业现状与核心挑战", "政策法规与行业标准", "全链路解决方案矩阵"],
+            },
+            {
+                "title": "行业应用矩阵分析",
+                "layout_id": "legal_regulation",
+                "points": ["成熟应用矩阵", "建模效率提升", "商业价值释放"],
+            },
+            {"title": "总结", "layout_id": "ending_modern", "points": []},
+        ],
+    }
+
+    guarded = apply_structured_outline_quality_guard(outline_doc, scheme_id="modern")
+    pages = guarded["pages"]
+
+    assert pages[1]["layout_id"] == "toc_modern"
+    assert pages[1]["title"] == "目录导航"
+    assert pages[2]["title"] == "主流软件生态对比与选型策略"
+    assert pages[2]["layout_id"] != "toc_modern"
+    assert sum(1 for page in pages if page.get("layout_id") == "toc_modern") == 1
