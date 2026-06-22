@@ -1,6 +1,7 @@
 """Database session and dependency injection for FastAPI."""
 import logging
 import os
+import hmac
 from dataclasses import dataclass
 from typing import Any
 from typing import AsyncGenerator
@@ -138,7 +139,31 @@ def _parse_auth_cookie_value(cookie_value: str | None) -> CurrentUser | None:
     return CurrentUser(user_id=user_id, username=username, auth_enabled=True)
 
 
+def _parse_teacherai_internal_user(request: Request) -> CurrentUser | None:
+    expected_token = (os.getenv("TEACHERAI_INTERNAL_TOKEN") or "").strip()
+    if not expected_token:
+        return None
+
+    received_token = (request.headers.get("x-teacherai-internal-token") or "").strip()
+    if not received_token or not hmac.compare_digest(received_token, expected_token):
+        return None
+
+    user_id = (request.headers.get("x-teacherai-user-id") or "").strip()
+    username = (request.headers.get("x-teacherai-username") or user_id or "teacherai").strip()
+    if not user_id:
+        return None
+
+    return CurrentUser(user_id=user_id, username=username, auth_enabled=True)
+
+
 def get_optional_current_user(request: Request) -> CurrentUser | None:
+    internal_user = _parse_teacherai_internal_user(request)
+    if internal_user is not None:
+        return internal_user
+
+    if (os.getenv("TEACHERAI_INTERNAL_TOKEN") or "").strip():
+        return None
+
     if not is_auth_enabled():
         return CurrentUser(user_id="1", username="legacy", auth_enabled=False)
 
